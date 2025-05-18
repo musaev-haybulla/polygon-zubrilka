@@ -19,6 +19,9 @@ $authors = $pdo
 <body class="bg-gray-100 p-6">
   <div class="max-w-lg mx-auto bg-white p-6 rounded shadow" x-data="formData()">
     <h1 class="text-2xl mb-4">Новый простой стих</h1>
+    <div class="mb-4 p-2 bg-blue-50 rounded">
+      <a href="add_poem_fragment.php" class="text-blue-600 hover:underline">Добавить фрагмент разделенного стихотворения →</a>
+    </div>
 
     <?php if (!empty($_GET['success'])): ?>
       <div id="msg" class="p-4 mb-4 text-green-800 bg-green-200 rounded">
@@ -32,12 +35,13 @@ $authors = $pdo
       </script>
     <?php endif; ?>
 
-    <form action="process_simple_poem.php" method="post" class="space-y-4">
+    <form action="process_poem.php" method="post" class="space-y-4">
       <!-- Название -->
       <div>
         <label class="block mb-1">Название</label>
         <input name="title" type="text" x-model="title" @input="validate()" required
                class="w-full border rounded px-3 py-2" placeholder="Введите название">
+        <input type="hidden" name="poem_id" value="0">
       </div>
 
       <!-- Авторы -->
@@ -58,8 +62,7 @@ $authors = $pdo
         <label class="block mb-1">Грейд (Школа)</label>
         <select name="grade_level" x-model="grade" @change="validate()" required
                 class="w-full border rounded px-3 py-2">
-          <option value="">— выберите грейд —</option>
-          <option value="primary">Начальная</option>
+          <option value="primary" selected>Начальная</option>
           <option value="middle">Средняя</option>
           <option value="secondary">Старшая</option>
         </select>
@@ -86,14 +89,11 @@ $authors = $pdo
       return {
         title: '',
         authorIds: [],
-        grade: '',
         poemText: '',
         canSubmit: false,
         validate() {
           this.canSubmit =
             this.title.trim() !== '' &&
-            this.authorIds.length > 0 &&
-            ['primary','middle','secondary'].includes(this.grade) &&
             this.poemText.trim() !== '';
         }
       };
@@ -103,6 +103,9 @@ $authors = $pdo
         plugins: ['remove_button'],
         create: true,
         persist: false,
+        onItemAdd:function(){
+          this.setTextboxValue('');
+        }
       });
     });
   </script>

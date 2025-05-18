@@ -1,0 +1,63 @@
+# Схема базы данных polygon-zubrilka
+# Сгенерировано 2025-05-16 00:01:47
+# Команда: mysql_to_dbdiagram 
+
+Table authors {
+  id           bigint            [pk, increment, not null]
+  first_name   varchar(100)      
+  middle_name  varchar(100)      
+  last_name    varchar(100)      
+  birth_year   int               
+  death_year   int               
+  biography    text              
+  created_at   datetime          [not null]
+  updated_at   datetime          [not null]
+  deleted_at   datetime          
+}
+
+Table fragments {
+  id              bigint                                       [pk, increment, not null]
+  poem_id         bigint                                       [not null]
+  owner_id        bigint                                       [not null]
+  label           varchar(255)                                 
+  structure_info  varchar(255)                                 
+  sort_order      int                                          [not null]
+  status          enum('draft','published','unpublished')      [not null]
+  created_at      datetime                                     [not null]
+  updated_at      datetime                                     [not null]
+  deleted_at      datetime                                     
+}
+
+Table lines {
+  id           bigint            [pk, increment, not null]
+  fragment_id  bigint            [not null]
+  line_number  int               [not null]
+  text         varchar(255)      [not null]
+  end_line     boolean           [not null]
+  created_at   datetime          [not null]
+  updated_at   datetime          [not null]
+  deleted_at   datetime          
+}
+
+Table poems {
+  id            bigint                                       [pk, increment, not null]
+  owner_id      bigint                                       
+  title         varchar(255)                                 [not null]
+  year_written  int                                          
+  status        enum('draft','published','unpublished')      [not null]
+  is_divided    boolean                                      [not null]
+  grade_level   enum('primary','middle','secondary')         [not null]
+  created_at    datetime                                     [not null]
+  updated_at    datetime                                     [not null]
+  deleted_at    datetime                                     
+}
+
+Table poem_authors {
+  poem_id    bigint      [pk, not null]
+  author_id  bigint      [pk, not null]
+}
+
+
+// Внешние ключи
+Ref: poem_authors.author_id > authors.id [delete: cascade]
+Ref: poem_authors.poem_id > poems.id [delete: cascade]

@@ -1,0 +1,42 @@
+[2025-05-16 16:08:37] Начало обработки. UserID=1
+[2025-05-16 16:08:37] BEGIN TRANSACTION
+[2025-05-16 16:08:37] Created new poem_id=155, is_divided=0
+[2025-05-16 16:08:37] Created new fragment_id=155
+[2025-05-16 16:08:37] Error: SQLSTATE[HY093]: Invalid parameter number: mixed named and positional parameters
+#0 /Users/musaevhs/Sites/testing/polygon-zubrilka/process_poem.php(145): PDOStatement->execute(Array)
+#1 {main}
+[2025-05-16 16:10:19] Начало обработки. UserID=1
+[2025-05-16 16:10:19] BEGIN TRANSACTION
+[2025-05-16 16:10:19] Created new poem_id=156, is_divided=0
+[2025-05-16 16:10:19] Created new fragment_id=156
+[2025-05-16 16:10:19] COMMIT successful for poem_id=156, fragment_id=156
+[2025-05-16 16:28:31] Начало обработки. UserID=1
+[2025-05-16 16:28:31] BEGIN TRANSACTION
+[2025-05-16 16:28:31] Created new poem_id=157, is_divided=1
+[2025-05-16 16:28:31] Created new fragment_id=157
+[2025-05-16 16:28:31] COMMIT successful for poem_id=157, fragment_id=157
+[2025-05-16 16:41:50] Начало обработки. UserID=1
+[2025-05-16 16:41:50] Ошибка валидации: title='', poemId=54, sortOrder=2
+[2025-05-16 16:43:35] Начало обработки. UserID=1
+[2025-05-16 16:43:35] BEGIN TRANSACTION
+[2025-05-16 16:43:35] Created new fragment_id=158
+[2025-05-16 16:43:35] COMMIT successful for poem_id=54, fragment_id=158
+[2025-05-18 00:39:20] Начало обработки. UserID=1
+[2025-05-18 00:39:20] BEGIN TRANSACTION
+[2025-05-18 00:39:20] Created new poem_id=158, is_divided=1
+[2025-05-18 00:39:20] Created new fragment_id=159
+[2025-05-18 00:39:20] COMMIT successful for poem_id=158, fragment_id=159
+[2025-05-18 00:40:37] Начало обработки. UserID=1
+[2025-05-18 00:40:37] BEGIN TRANSACTION
+[2025-05-18 00:40:37] Created new poem_id=159, is_divided=1
+[2025-05-18 00:40:37] Created new fragment_id=160
+[2025-05-18 00:40:37] COMMIT successful for poem_id=159, fragment_id=160
+[2025-05-18 00:48:44] Начало обработки. UserID=1
+[2025-05-18 00:48:44] BEGIN TRANSACTION
+[2025-05-18 00:48:44] Created new fragment_id=161
+[2025-05-18 00:48:44] COMMIT successful for poem_id=159, fragment_id=161
+[2025-05-18 00:49:57] Начало обработки. UserID=1
+[2025-05-18 00:49:57] BEGIN TRANSACTION
+[2025-05-18 00:49:57] Created new poem_id=160, is_divided=0
+[2025-05-18 00:49:57] Created new fragment_id=162
+[2025-05-18 00:49:57] COMMIT successful for poem_id=160, fragment_id=162
