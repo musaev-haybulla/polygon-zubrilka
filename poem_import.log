@@ -1,0 +1,5 @@
+[2025-05-21 03:59:07] Начало обработки. UserID=1
+[2025-05-21 03:59:07] BEGIN TRANSACTION
+[2025-05-21 03:59:07] Created new poem_id=162, is_divided=0
+[2025-05-21 03:59:07] Created new fragment_id=165
+[2025-05-21 03:59:07] COMMIT successful for poem_id=162, fragment_id=165

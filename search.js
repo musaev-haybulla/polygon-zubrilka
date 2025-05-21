@@ -34,25 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Запрос поиска:', query);
         
-        // Специальная обработка для "Евгений Онегин"
-        if (query.toLowerCase().includes('евгений') || query.toLowerCase().includes('онегин')) {
-            console.log('Найден запрос "Евгений Онегин" - применяем прямой поиск');
-            // Прямой поиск без обращения к API
-            const results = [
-                {
-                    type: 'poem',
-                    id: 54,
-                    title: 'Евгений Онегин',
-                    year_written: null,
-                    author: 'Александр Пушкин'
-                }
-            ];
-            // Небольшая задержка чтобы имитировать запрос к API
-            setTimeout(() => displayResults(results), 300);
-            return;
-        }
-        
-        // Стандартный запрос через API для других поисковых запросов
+        // Стандартный запрос через API для всех поисковых запросов
         fetch('search_api.php?query=' + encodeURIComponent(query))
             .then(response => {
                 console.log('Статус ответа:', response.status);
@@ -135,10 +117,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     item.year_written && `Год: <span class="font-medium">${item.year_written}</span>`
                 ].filter(Boolean).join(' • ');
                 
+                let content = '';
+                if (item.fragments) {
+                    content = '<div class="mt-2 space-y-4">';
+                    item.fragments.forEach(f => {
+                        content += '<div class="border-t border-gray-200 pt-2">';
+                        if (f.label) {
+                            content += `<p class="text-sm font-medium text-gray-800">${f.label}</p>`;
+                        }
+                        f.lines.forEach(line => {
+                            if (line) content += `<p class="line">${line}</p>`;
+                        });
+                        content += '</div>';
+                    });
+                    content += '</div>';
+                } else {
+                    content = renderLines(item.lines);
+                }
+                
                 html += renderCard(
                     item.title || 'Без названия',
                     meta,
-                    renderLines(item.lines),
+                    content,
                     'poem'
                 );
                 

@@ -70,7 +70,7 @@ try {
     $addedFragmentIds = [];
     
     // 1. Поиск по названию стихотворения
-    $sql = "SELECT p.id, p.title, p.year_written, 
+    $sql = "SELECT p.id, p.title, p.year_written,
            GROUP_CONCAT(DISTINCT CONCAT(a.first_name, ' ', a.last_name) SEPARATOR ', ') AS author
            FROM `poems` p
            LEFT JOIN `poem_authors` pa ON p.id = pa.poem_id
@@ -82,20 +82,45 @@ try {
     $stmt->execute(['query' => $searchTerm]);
     
     foreach ($stmt->fetchAll() as $row) {
-        // Добавляем ID в список найденных
         $addedPoemIds[] = $row['id'];
-        
-        // Получаем первые две строки
-        $firstLines = getFirstTwoLines($pdo, $row['id']);
-        
-        $poemResults[] = [
-            'type' => 'poem',
-            'id' => $row['id'],
-            'title' => $row['title'],
-            'year_written' => $row['year_written'],
-            'author' => $row['author'] ? $row['author'] : 'Не указан',
-            'lines' => $firstLines
-        ];
+
+        // Динамическая обработка фрагментов
+        $fragStmt = $pdo->prepare("SELECT f.id, f.label FROM `fragments` f WHERE f.poem_id = :poem_id AND f.deleted_at IS NULL ORDER BY f.sort_order ASC");
+        $fragStmt->execute(['poem_id' => $row['id']]);
+        $fragments = $fragStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($fragments) > 1) {
+            $allFragments = [];
+            foreach ($fragments as $frag) {
+                $lineStmt = $pdo->prepare("SELECT l.text FROM `lines` l WHERE l.fragment_id = :fragment_id AND l.line_number IN (1, 2) AND l.deleted_at IS NULL ORDER BY l.line_number ASC LIMIT 2");
+                $lineStmt->execute(['fragment_id' => $frag['id']]);
+                $fragLines = $lineStmt->fetchAll(PDO::FETCH_COLUMN);
+                $fragLines = array_pad($fragLines, 2, '');
+                $allFragments[] = [
+                    'fragment_id' => $frag['id'],
+                    'label' => $frag['label'],
+                    'lines' => $fragLines
+                ];
+            }
+            $poemResults[] = [
+                'type' => 'poem',
+                'id' => $row['id'],
+                'title' => $row['title'],
+                'year_written' => $row['year_written'],
+                'author' => $row['author'] ? $row['author'] : 'Не указан',
+                'fragments' => $allFragments
+            ];
+        } else {
+            $firstLines = getFirstTwoLines($pdo, $row['id']);
+            $poemResults[] = [
+                'type' => 'poem',
+                'id' => $row['id'],
+                'title' => $row['title'],
+                'year_written' => $row['year_written'],
+                'author' => $row['author'] ? $row['author'] : 'Не указан',
+                'lines' => $firstLines
+            ];
+        }
     }
     
     // 2. Поиск по первой строке
