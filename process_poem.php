@@ -94,10 +94,10 @@ try {
         $isDivided = isset($_POST['is_divided']) ? 1 : 0;
         $stmt = $pdo->prepare(
             "INSERT INTO poems 
-             (owner_id, title, grade_level, is_divided, status, created_at, updated_at)
-             VALUES (:o, :t, :g, :d, 'draft', NOW(), NOW())"
+             (owner_id, title, is_divided, status, created_at, updated_at)
+             VALUES (:o, :t, :d, 'draft', NOW(), NOW())"
         );
-        $stmt->execute([':o' => $userId, ':t' => $title, ':g' => $grade, ':d' => $isDivided]);
+        $stmt->execute([':o' => $userId, ':t' => $title, ':d' => $isDivided]);
         $poemId = (int)$pdo->lastInsertId();
         logMsg("Created new poem_id={$poemId}, is_divided={$isDivided}");
     }
@@ -128,29 +128,31 @@ try {
     if ($fragmentId === 0) {
         $stmt = $pdo->prepare(
             "INSERT INTO fragments 
-             (poem_id, owner_id, label, structure_info, sort_order, status, created_at, updated_at)
-             VALUES (:p, :o, :l, :s, :so, 'draft', NOW(), NOW())"
+             (poem_id, owner_id, label, structure_info, sort_order, grade_level, status, created_at, updated_at)
+             VALUES (:p, :o, :l, :s, :so, :g, 'draft', NOW(), NOW())"
         );
         $stmt->execute([
             ':p'  => $poemId,
             ':o'  => $userId,
             ':l'  => $label ?: null,
             ':s'  => $structure ?: null,
-            ':so' => $newSortOrder
+            ':so' => $newSortOrder,
+            ':g'  => $grade
         ]);
         $fragmentId = (int)$pdo->lastInsertId();
         logMsg("Created new fragment_id={$fragmentId}");
     } else {
         $stmt = $pdo->prepare(
             "UPDATE fragments 
-             SET label = :l, structure_info = :s, updated_at = NOW()
+             SET label = :l, structure_info = :s, grade_level = :g, updated_at = NOW()
              WHERE id = :id AND owner_id = :o"
         );
         $stmt->execute([
             ':id' => $fragmentId,
             ':o'  => $userId,
             ':l'  => $label ?: null,
-            ':s'  => $structure ?: null
+            ':s'  => $structure ?: null,
+            ':g'  => $grade
         ]);
         logMsg("Updated fragment_id={$fragmentId}");
     }

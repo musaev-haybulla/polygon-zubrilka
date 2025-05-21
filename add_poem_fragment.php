@@ -72,17 +72,8 @@ $fragments = [];
             <div x-show="!selectedPoemId" class="space-y-4 mt-4 p-4 bg-gray-50 rounded">
                 <input type="hidden" name="title" x-model="poemTitle">
                 <div>
-                    <label class="block mb-1">Грейд (Школа)</label>
-                    <select name="grade_level" class="w-full border rounded px-3 py-2" :required="!selectedPoemId">
-                        <option value="primary">Начальная</option>
-                        <option value="middle">Средняя</option>
-                        <option value="secondary">Старшая</option>
-                    </select>
-                </div>
-                <div>
                     <label class="block mb-1">Авторы</label>
-                    <select id="author-select" name="author_ids[]" x-model="authorIds" @change="validate()" multiple
-                            class="w-full border rounded px-3 py-2">
+                    <select id="author-select" name="author_ids[]" x-model="authorIds" @change="validate()" multiple class="w-full border rounded px-3 py-2">
                         <?php foreach ($authors as $a): ?>
                             <option value="<?= htmlspecialchars((string)$a['id']) ?>">
                                 <?= htmlspecialchars($a['full_name']) ?>
@@ -111,12 +102,24 @@ $fragments = [];
             </div>
 
             <div>
+                <label class="block mb-1">Грейд (Школа)</label>
+                <select name="grade_level" x-model="fragmentGrade" @change="validate()" class="w-full border rounded px-3 py-2">
+                    <option value="primary">Начальная</option>
+                    <option value="middle" selected>Средняя</option>
+                    <option value="secondary">Старшая</option>
+                </select>
+            </div>
+
+            <div>
                 <label class="block mb-1">Порядок вставки</label>
                 <select name="sort_order" class="w-full border rounded px-3 py-2" x-html="sortOrderOptions">
                     <option value="0">Сделать первым</option>
                     <?php foreach ($fragments as $fragment): ?>
                         <option value="<?= $fragment['sort_order'] + 1 ?>">
-                            После "<?= htmlspecialchars($fragment['label'] ?: 'Фрагмент ' . $fragment['sort_order']) ?>"
+                            После "<?= htmlspecialchars(
+                                $fragment['label']
+                                ?: preg_replace('/[.,!?;:]+$/u', '', $fragment['first_line']) . '...'
+                            ) ?>"
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -151,6 +154,7 @@ document.addEventListener('alpine:init', () => {
         debugInfo: '',
         fragments: <?= json_encode($fragments) ?>,
         selectedPoemId: 0,  // Всегда начинаем с 0, так как больше не используем poem_id из URL
+        fragmentGrade: 'middle',
         
         async init() {
             // Ждем загрузки DOM и скриптов
@@ -297,7 +301,9 @@ document.addEventListener('alpine:init', () => {
             
             let options = '<option value="0">Сделать первым</option>';
             this.fragments.forEach((frag, index) => {
-                const label = frag.label || `Фрагмент ${frag.sort_order}`;
+                const label = frag.label
+                    ? frag.label
+                    : frag.first_line.replace(/[.,!?;:]+$/u, '') + '...';
                 const value = frag.sort_order + 1;
                 options += `<option value="${value}">После "${this.escapeHtml(label)}"</option>`;
             });

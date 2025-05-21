@@ -62,8 +62,8 @@ $authors = $pdo
         <label class="block mb-1">Грейд (Школа)</label>
         <select name="grade_level" x-model="grade" @change="validate()" required
                 class="w-full border rounded px-3 py-2">
-          <option value="primary" selected>Начальная</option>
-          <option value="middle">Средняя</option>
+          <option value="primary">Начальная</option>
+          <option value="middle" selected>Средняя</option>
           <option value="secondary">Старшая</option>
         </select>
       </div>
@@ -90,6 +90,7 @@ $authors = $pdo
         title: '',
         authorIds: [],
         poemText: '',
+        grade: 'middle',
         canSubmit: false,
         validate() {
           this.canSubmit =
