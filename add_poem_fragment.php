@@ -31,6 +31,7 @@ $fragments = [];
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.default.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js"></script>
+  <script src="poem_utils.js" defer></script>
 </head>
 <body class="bg-gray-100 p-6">
 <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow" x-data="formData()">
@@ -129,10 +130,15 @@ $fragments = [];
 
             <div>
                 <label class="block mb-1">Текст фрагмента</label>
-                <textarea name="poem_text" rows="10" required 
-                          class="w-full border rounded px-3 py-2"
+                <textarea name="poem_text" rows="8" required
+                          class="w-full border rounded px-3 py-2" 
                           x-on:input="checkText()"
                           placeholder="Введите текст фрагмента, разделяя строфы пустой строкой"></textarea>
+                <div class="mt-2 flex space-x-2">
+                    <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 4))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на четверостишья</button>
+                    <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 6))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на шестистишья</button>
+                    <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 8))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на восьмистишья</button>
+                </div>
             </div>
         </div>
 

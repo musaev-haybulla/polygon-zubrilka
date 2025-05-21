@@ -15,6 +15,7 @@ $authors = $pdo
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.default.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js" defer></script>
+  <script src="poem_utils.js" defer></script>
 </head>
 <body class="bg-gray-100 p-6">
   <div class="max-w-lg mx-auto bg-white p-6 rounded shadow" x-data="formData()">
@@ -73,9 +74,14 @@ $authors = $pdo
       <!-- Текст стихотворения -->
       <div>
         <label class="block mb-1">Текст стихотворения</label>
-        <textarea name="poem_text" x-model="poemText" @input="validate()" rows="8" required
+        <textarea name="poem_text" x-model="poemText" @input="updateTitle(); validate()" rows="8" required
                   class="w-full border rounded px-3 py-2"
                   placeholder="Вставьте весь текст стихотворения, разделяя строфы пустой строкой"></textarea>
+        <div class="mt-2 flex space-x-2">
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 4); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на четверостишья</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 6); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на шестистишья</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 8); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на восьмистишья</button>
+        </div>
       </div>
 
       <!-- Отправка -->
@@ -94,6 +100,11 @@ $authors = $pdo
         poemText: '',
         grade: 'middle',
         canSubmit: false,
+        updateTitle() {
+          if (!this.title) {
+            this.title = this.poemText.split('\n')[0].replace(/[.,!;:\n\r]+$/g, '');
+          }
+        },
         validate() {
           this.canSubmit =
             this.title.trim() !== '' &&
