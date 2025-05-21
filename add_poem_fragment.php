@@ -134,11 +134,12 @@ $fragments = [];
                           class="w-full border rounded px-3 py-2" 
                           x-on:input="checkText()"
                           placeholder="Введите текст фрагмента, разделяя строфы пустой строкой"></textarea>
-                <div class="mt-2 flex space-x-2">
-                    <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 4))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на четверостишья</button>
-                    <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 6))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на шестистишья</button>
-                    <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 8))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на восьмистишья</button>
-                </div>
+                          <div class="mt-2 flex space-x-2">
+                            <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 4))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">4</button>
+                            <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 5))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">5</button>
+                            <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 6))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">6</button>
+                            <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 8))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">8</button>
+                          </div>
             </div>
         </div>
 

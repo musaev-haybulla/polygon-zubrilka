@@ -78,9 +78,10 @@ $authors = $pdo
                   class="w-full border rounded px-3 py-2"
                   placeholder="Вставьте весь текст стихотворения, разделяя строфы пустой строкой"></textarea>
         <div class="mt-2 flex space-x-2">
-          <button type="button" @click="poemText = splitIntoStanzas(poemText, 4); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на четверостишья</button>
-          <button type="button" @click="poemText = splitIntoStanzas(poemText, 6); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на шестистишья</button>
-          <button type="button" @click="poemText = splitIntoStanzas(poemText, 8); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Разбить на восьмистишья</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 4); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">4</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 5); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">5</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 6); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">6</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 8); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">8</button>
         </div>
       </div>
 
