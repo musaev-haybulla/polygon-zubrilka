@@ -1,5 +1,5 @@
 # Схема базы данных polygon-zubrilka
-# Сгенерировано 2025-05-16 00:01:47
+# Сгенерировано 2025-05-21 06:05:34
 # Команда: mysql_to_dbdiagram 
 
 Table authors {
@@ -22,6 +22,7 @@ Table fragments {
   label           varchar(255)                                 
   structure_info  varchar(255)                                 
   sort_order      int                                          [not null]
+  grade_level     enum('primary','middle','secondary')         [not null]
   status          enum('draft','published','unpublished')      [not null]
   created_at      datetime                                     [not null]
   updated_at      datetime                                     [not null]
@@ -46,7 +47,6 @@ Table poems {
   year_written  int                                          
   status        enum('draft','published','unpublished')      [not null]
   is_divided    boolean                                      [not null]
-  grade_level   enum('primary','middle','secondary')         [not null]
   created_at    datetime                                     [not null]
   updated_at    datetime                                     [not null]
   deleted_at    datetime                                     

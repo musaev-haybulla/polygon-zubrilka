@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск стихотворений</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Сохраняем только необходимые стили, остальное заменим на Tailwind */
+        #search-input {
+            width: 70%;
+            padding: 0.625rem;
+            font-size: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+        }
+        #search-button {
+            padding: 0.625rem 1rem;
+            font-size: 1rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #search-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Поиск стихотворений</h1>
+        
+        <div class="bg-blue-50 rounded-lg p-4 mb-8">
+            <nav class="flex items-center space-x-4">
+                <a href="add_simple_poem.php" class="text-blue-600 hover:text-blue-800 hover:underline">Добавить простой стих</a>
+                <span class="text-gray-400">|</span>
+                <a href="add_poem_fragment.php" class="text-blue-600 hover:text-blue-800 hover:underline">Добавить фрагмент</a>
+            </nav>
+        </div>
+
+        <div class="flex space-x-2 mb-8">
+            <input type="text" 
+                   id="search-input" 
+                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   placeholder="Введите название, первую строку или метку...">
+            <button id="search-button" 
+                    class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                Найти
+            </button>
+        </div>
+
+        <div id="results" class="space-y-4"></div>
+    </div>
+
+    <script src="search.js"></script>
+</body>
+</html>

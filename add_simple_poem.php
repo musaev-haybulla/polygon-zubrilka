@@ -19,8 +19,10 @@ $authors = $pdo
 <body class="bg-gray-100 p-6">
   <div class="max-w-lg mx-auto bg-white p-6 rounded shadow" x-data="formData()">
     <h1 class="text-2xl mb-4">Новый простой стих</h1>
-    <div class="mb-4 p-2 bg-blue-50 rounded">
-      <a href="add_poem_fragment.php" class="text-blue-600 hover:underline">Добавить фрагмент разделенного стихотворения →</a>
+    <div class="mb-6 p-2 bg-blue-50 rounded">
+      <a href="search.html" class="text-blue-600 hover:underline">Поиск</a>
+      <span class="mx-2">|</span>
+      <a href="add_poem_fragment.php" class="text-blue-600 hover:underline">Добавить фрагмент</a>
     </div>
 
     <?php if (!empty($_GET['success'])): ?>

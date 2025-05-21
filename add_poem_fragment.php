@@ -36,7 +36,9 @@ $fragments = [];
 <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow" x-data="formData()">
     <h1 class="text-2xl mb-4">Добавить фрагмент стихотворения</h1>
     <div class="mb-6 p-2 bg-blue-50 rounded">
-      <a href="add_simple_poem.php" class="text-blue-600 hover:underline">Добавить простой стих →</a>
+      <a href="search.html" class="text-blue-600 hover:underline">Поиск</a>
+      <span class="mx-2">|</span>
+      <a href="add_simple_poem.php" class="text-blue-600 hover:underline">Добавить простой стих</a>
     </div>
 
     <?php if (!empty($_GET['success'])): ?>

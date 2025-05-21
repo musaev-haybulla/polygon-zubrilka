@@ -71,3 +71,13 @@
 [2025-05-21 01:53:32] BEGIN TRANSACTION
 [2025-05-21 01:53:32] Created new fragment_id=166
 [2025-05-21 01:53:32] COMMIT successful for poem_id=159, fragment_id=166
+[2025-05-21 02:26:22] Начало обработки. UserID=1
+[2025-05-21 02:26:22] BEGIN TRANSACTION
+[2025-05-21 02:26:22] Created new poem_id=159, is_divided=1
+[2025-05-21 02:26:22] Created new fragment_id=162
+[2025-05-21 02:26:22] COMMIT successful for poem_id=159, fragment_id=162
+[2025-05-21 02:29:31] Начало обработки. UserID=1
+[2025-05-21 02:29:31] BEGIN TRANSACTION
+[2025-05-21 02:29:31] Created new poem_id=160, is_divided=0
+[2025-05-21 02:29:31] Created new fragment_id=163
+[2025-05-21 02:29:31] COMMIT successful for poem_id=160, fragment_id=163
