@@ -187,18 +187,13 @@ try {
     // Объединяем результаты в правильном порядке, избегая дубликатов
     $results = array_merge($poemResults, $firstLineResults, $fragmentResults);
     
-    // Ведём лог результатов
-    file_put_contents('search_log.txt', 
-        date('Y-m-d H:i:s') . " Результаты: " . count($results) . " - " . json_encode($results, JSON_UNESCAPED_UNICODE) . "\n", 
-        FILE_APPEND);
-    
     // Возвращаем результаты с поддержкой кириллицы
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode($results, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     
 } catch (PDOException $e) {
-    // В случае ошибки ведём лог и возвращаем пустой массив
-    file_put_contents('search_log.txt', 
-        date('Y-m-d H:i:s') . " Ошибка: " . $e->getMessage() . "\n", 
-        FILE_APPEND);
-    echo json_encode([], JSON_UNESCAPED_UNICODE);
+    // В случае ошибки возвращаем пустой массив
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode(['error' => 'Произошла ошибка при выполнении поиска'], JSON_UNESCAPED_UNICODE);
 }
