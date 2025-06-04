@@ -66,8 +66,8 @@ $authors = $pdo
         <select name="grade_level" x-model="grade" @change="validate()" required
                 class="w-full border rounded px-3 py-2">
           <option value="primary">Начальная</option>
-          <option value="middle" selected>Средняя</option>
-          <option value="secondary">Старшая</option>
+          <option value="middle">Средняя</option>
+          <option value="secondary" selected>Старшая</option>
         </select>
       </div>
 
@@ -82,6 +82,7 @@ $authors = $pdo
           <button type="button" @click="poemText = splitIntoStanzas(poemText, 5); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">5</button>
           <button type="button" @click="poemText = splitIntoStanzas(poemText, 6); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">6</button>
           <button type="button" @click="poemText = splitIntoStanzas(poemText, 8); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">8</button>
+          <button type="button" @click="poemText = splitIntoStanzas(poemText, 10); validate()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">10</button>
         </div>
       </div>
 
@@ -99,7 +100,7 @@ $authors = $pdo
         title: '',
         authorIds: [],
         poemText: '',
-        grade: 'middle',
+        grade: 'secondary',
         canSubmit: false,
         updateTitle() {
           if (!this.title) {

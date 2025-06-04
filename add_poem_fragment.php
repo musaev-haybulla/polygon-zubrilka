@@ -108,8 +108,8 @@ $fragments = [];
                 <label class="block mb-1">Грейд (Школа)</label>
                 <select name="grade_level" x-model="fragmentGrade" @change="validate()" class="w-full border rounded px-3 py-2">
                     <option value="primary">Начальная</option>
-                    <option value="middle" selected>Средняя</option>
-                    <option value="secondary">Старшая</option>
+                    <option value="middle">Средняя</option>
+                    <option value="secondary" selected>Старшая</option>
                 </select>
             </div>
 
@@ -139,6 +139,7 @@ $fragments = [];
                             <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 5))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">5</button>
                             <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 6))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">6</button>
                             <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 8))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">8</button>
+                            <button type="button" onclick="setTextAreaValue('poem_text', splitIntoStanzas(document.querySelector('textarea[name=\'poem_text\']').value, 10))" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">10</button>
                           </div>
             </div>
         </div>
@@ -163,7 +164,7 @@ document.addEventListener('alpine:init', () => {
         debugInfo: '',
         fragments: <?= json_encode($fragments) ?>,
         selectedPoemId: 0,  // Всегда начинаем с 0, так как больше не используем poem_id из URL
-        fragmentGrade: 'middle',
+        fragmentGrade: 'secondary',
         
         async init() {
             // Ждем загрузки DOM и скриптов
