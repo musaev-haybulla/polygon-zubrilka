@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск стихов</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+            line-height: 1.6;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #2c3e50;
+        }
+        
+        .search-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .suggestions-container {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        
+        .suggestion-item:hover,
+        .suggestion-item.active {
+            background-color: #f8f9fa;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .suggestion-icon {
+            margin-right: 12px;
+            width: 20px;
+            text-align: center;
+            opacity: 0.6;
+        }
+        
+        .suggestion-content {
+            flex: 1;
+        }
+        
+        .suggestion-title {
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+        
+        .suggestion-subtitle {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        .suggestion-highlight {
+            background: #fff3cd;
+            color: #856404;
+            font-weight: bold;
+        }
+        
+        #searchInput {
+            width: 100%;
+            font-size: 18px;
+            padding: 15px 50px 15px 20px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            box-sizing: border-box;
+        }
+        
+        #searchInput:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,.25);
+        }
+        
+        .search-button {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .search-button:hover {
+            background: #0056b3;
+        }
+        
+        .results-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .search-stats {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .hit-item {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #fff;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .hit-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .hit-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .hit-type.author {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .hit-type.poem_large {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .hit-type.poem_small {
+            background: #e8f5e8;
+            color: #388e3c;
+        }
+        
+        .hit-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        
+        .hit-author {
+            color: #666;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+        
+        .hit-first-line {
+            color: #444;
+            font-size: 16px;
+            line-height: 1.4;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+        
+        .hit-text {
+            color: #555;
+            line-height: 1.6;
+            white-space: pre-line;
+            max-height: 150px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .hit-text::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, white);
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            color: #856404;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+        }
+        
+        .no-results {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .examples {
+            margin-top: 20px;
+        }
+        
+        .example-query {
+            display: inline-block;
+            background: #e9ecef;
+            color: #495057;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .example-query:hover {
+            background: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Поиск по детским стихам</h1>
+        <p>Найдите стихи по автору, названию, первой строке или тексту</p>
+    </div>
+
+    <div class="search-container">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Введите автора, название или строку из стиха..." autocomplete="off">
+            <button class="search-button" onclick="manualSearch()">🔍</button>
+            <div id="suggestionsContainer" class="suggestions-container"></div>
+        </div>
+        
+        <div class="examples">
+            <strong>Примеры запросов:</strong>
+            <span class="example-query" onclick="setQuery('Пушкин')">Пушкин</span>
+            <span class="example-query" onclick="setQuery('мороз солнце')">мороз солнце</span>
+            <span class="example-query" onclick="setQuery('тучка золотая')">тучка золотая</span>
+            <span class="example-query" onclick="setQuery('Зимнее утро')">Зимнее утро</span>
+            <span class="example-query" onclick="setQuery('белеет парус')">белеет парус</span>
+        </div>
+    </div>
+
+    <div class="results-container">
+        <div id="searchStats"></div>
+        <div id="searchResults"></div>
+    </div>
+
+    <script>
+        const MEILISEARCH_HOST = 'https://testing.local:7701';
+        const MEILISEARCH_KEY = 'SqNO0v-eMRxckMZnpcFla3fgEpiH5UQR9PGY-z2tLNg';
+        const INDEX_NAME = 'content';
+        
+        // Проверяем протокол и показываем предупреждение
+        if (window.location.protocol === 'https:') {
+            console.warn('⚠️ HTTPS → HTTP запросы могут блокироваться браузером');
+            console.log('💡 Решение: запустите страницу через http:// или настройте HTTPS для Meilisearch');
+        }
+        
+        let searchTimeout;
+        let suggestionsTimeout;
+        let currentSuggestionIndex = -1;
+        let currentSuggestions = [];
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const suggestionsContainer = document.getElementById('suggestionsContainer');
+            
+            // Поиск при вводе с задержкой
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                clearTimeout(searchTimeout);
+                clearTimeout(suggestionsTimeout);
+                
+                if (query.length === 0) {
+                    clearResults();
+                    hideSuggestions();
+                    return;
+                }
+                
+                // Показываем suggestions быстро для коротких запросов
+                if (query.length >= 2) {
+                    suggestionsTimeout = setTimeout(() => {
+                        fetchSuggestions(query);
+                    }, 150);
+                }
+                
+                // НЕ запускаем автоматический полный поиск при вводе
+                // Только по Enter или клику на suggestion
+            });
+            
+            // Поиск при нажатии Enter
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (currentSuggestionIndex >= 0 && currentSuggestions[currentSuggestionIndex]) {
+                        selectSuggestion(currentSuggestions[currentSuggestionIndex]);
+                    } else {
+                        // Полный поиск по тому, что ввел пользователь
+                        performSearch(this.value.trim());
+                        hideSuggestions();
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    navigateSuggestions(1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    navigateSuggestions(-1);
+                } else if (e.key === 'Escape') {
+                    hideSuggestions();
+                }
+            });
+            
+            // Скрываем suggestions при клике вне
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.search-box')) {
+                    hideSuggestions();
+                }
+            });
+        });
+        
+        function manualSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query) {
+                hideSuggestions();
+                performSearch(query);
+            }
+        }
+        
+        function setQuery(query) {
+            document.getElementById('searchInput').value = query;
+            hideSuggestions();
+            performSearch(query);
+        }
+        
+        async function fetchSuggestions(query) {
+            if (!query || query.length < 2) return;
+            
+            try {
+                const searchUrl = `${MEILISEARCH_HOST}/indexes/${INDEX_NAME}/search`;
+                
+                const response = await fetch(searchUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${MEILISEARCH_KEY}`
+                    },
+                    body: JSON.stringify({
+                        q: query,
+                        attributesToHighlight: ['name', 'title', 'author_name', 'first_line'],
+                        highlightPreTag: '<span class="suggestion-highlight">',
+                        highlightPostTag: '</span>',
+                        limit: 8
+                    })
+                });
+                
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                displaySuggestions(data.hits, query);
+                
+            } catch (error) {
+                console.error('Ошибка получения suggestions:', error);
+            }
+        }
+        
+        function displaySuggestions(hits, query) {
+            const container = document.getElementById('suggestionsContainer');
+            currentSuggestions = hits;
+            currentSuggestionIndex = -1;
+            
+            if (hits.length === 0) {
+                hideSuggestions();
+                return;
+            }
+            
+            let html = '';
+            
+            hits.forEach((hit, index) => {
+                const icon = getSuggestionIcon(hit.type);
+                const title = getSuggestionTitle(hit);
+                const subtitle = getSuggestionSubtitle(hit.type);
+                
+                html += `
+                    <div class="suggestion-item" data-index="${index}">
+                        <div class="suggestion-icon">${icon}</div>
+                        <div class="suggestion-content">
+                            <div class="suggestion-title">${title}</div>
+                            <div class="suggestion-subtitle">${subtitle}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+            container.style.display = 'block';
+            
+            // Добавляем обработчики кликов
+            container.querySelectorAll('.suggestion-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    selectSuggestion(currentSuggestions[index]);
+                });
+            });
+        }
+        
+        function getSuggestionIcon(type) {
+            switch(type) {
+                case 'author': return '👨‍🎨';
+                case 'poem_large': return '📚';
+                case 'poem_small': return '📝';
+                default: return '🔍';
+            }
+        }
+        
+        function getSuggestionTitle(hit) {
+            if (hit.type === 'author') {
+                return getHighlighted(hit, 'name') || hit.name;
+            } else {
+                let title = getHighlighted(hit, 'title') || hit.title;
+                if (hit.author_name) {
+                    title += ` — ${getHighlighted(hit, 'author_name') || hit.author_name}`;
+                }
+                return title;
+            }
+        }
+        
+        function getSuggestionSubtitle(type) {
+            switch(type) {
+                case 'author': return 'Автор';
+                case 'poem_large': return 'Крупное произведение';
+                case 'poem_small': return 'Стихотворение';
+                default: return '';
+            }
+        }
+        
+        function navigateSuggestions(direction) {
+            const items = document.querySelectorAll('.suggestion-item');
+            if (items.length === 0) return;
+            
+            // Убираем активный класс
+            if (currentSuggestionIndex >= 0) {
+                items[currentSuggestionIndex].classList.remove('active');
+            }
+            
+            // Обновляем индекс
+            currentSuggestionIndex += direction;
+            
+            if (currentSuggestionIndex < 0) {
+                currentSuggestionIndex = -1;
+            } else if (currentSuggestionIndex >= items.length) {
+                currentSuggestionIndex = items.length - 1;
+            }
+            
+            // Добавляем активный класс
+            if (currentSuggestionIndex >= 0) {
+                items[currentSuggestionIndex].classList.add('active');
+                items[currentSuggestionIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+        
+        function selectSuggestion(hit) {
+            const searchInput = document.getElementById('searchInput');
+            
+            if (hit.type === 'author') {
+                searchInput.value = hit.name;
+            } else {
+                searchInput.value = hit.title;
+            }
+            
+            hideSuggestions();
+            // Запускаем полный поиск после выбора suggestion
+            performSearch(searchInput.value);
+        }
+        
+        function hideSuggestions() {
+            const container = document.getElementById('suggestionsContainer');
+            container.style.display = 'none';
+            currentSuggestionIndex = -1;
+            currentSuggestions = [];
+        }
+        
+        async function performSearch(query) {
+            if (!query) {
+                query = document.getElementById('searchInput').value.trim();
+            }
+            
+            if (!query) return;
+            
+            hideSuggestions(); // Скрываем suggestions при полном поиске
+            showLoading();
+            
+            try {
+                const searchUrl = `${MEILISEARCH_HOST}/indexes/${INDEX_NAME}/search`;
+                
+                const response = await fetch(searchUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${MEILISEARCH_KEY}`
+                    },
+                    body: JSON.stringify({
+                        q: query,
+                        attributesToHighlight: ['*'],
+                        highlightPreTag: '<span class="highlight">',
+                        highlightPostTag: '</span>',
+                        limit: 20
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                displayResults(data, query);
+                
+            } catch (error) {
+                showError('Ошибка поиска: ' + error.message);
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('searchStats').innerHTML = '';
+            document.getElementById('searchResults').innerHTML = '<div class="loading">Поиск...</div>';
+        }
+        
+        function showError(message) {
+            document.getElementById('searchStats').innerHTML = '';
+            document.getElementById('searchResults').innerHTML = `<div class="error">${message}</div>`;
+        }
+        
+        function clearResults() {
+            document.getElementById('searchStats').innerHTML = '';
+            document.getElementById('searchResults').innerHTML = '';
+        }
+        
+        function displayResults(data, query) {
+            const statsElement = document.getElementById('searchStats');
+            const resultsElement = document.getElementById('searchResults');
+            
+            // Статистика
+            const hitCount = data.hits.length;
+            const totalHits = data.estimatedTotalHits || hitCount;
+            const processingTime = data.processingTimeMs;
+            
+            if (hitCount === 0) {
+                statsElement.innerHTML = `Ничего не найдено по запросу "${query}"`;
+                resultsElement.innerHTML = '<div class="no-results">Попробуйте изменить запрос или воспользуйтесь примерами выше</div>';
+                return;
+            }
+            
+            statsElement.innerHTML = `Найдено ${totalHits} результат${getPlural(totalHits)} за ${processingTime}мс`;
+            
+            // Результаты
+            let html = '';
+            
+            data.hits.forEach(hit => {
+                html += formatHit(hit);
+            });
+            
+            resultsElement.innerHTML = html;
+        }
+        
+        function formatHit(hit) {
+            let typeLabel = '';
+            let typeClass = '';
+            
+            switch(hit.type) {
+                case 'author':
+                    typeLabel = 'Автор';
+                    typeClass = 'author';
+                    break;
+                case 'poem_large':
+                    typeLabel = 'Крупное произведение';
+                    typeClass = 'poem_large';
+                    break;
+                case 'poem_small':
+                    typeLabel = 'Стихотворение';
+                    typeClass = 'poem_small';
+                    break;
+            }
+            
+            let content = `<div class="hit-item">
+                <span class="hit-type ${typeClass}">${typeLabel}</span>`;
+            
+            if (hit.type === 'author') {
+                content += `
+                    <div class="hit-title">${getHighlighted(hit, 'name')}</div>
+                    ${hit._highlightResult?.name_variants ? 
+                        `<div class="hit-author">Варианты: ${hit._highlightResult.name_variants.map(v => v.value).join(', ')}</div>` 
+                        : ''
+                    }
+                `;
+            } else {
+                content += `
+                    <div class="hit-title">${getHighlighted(hit, 'title')}</div>
+                    ${hit.author_name ? 
+                        `<div class="hit-author">${getHighlighted(hit, 'author_name')}</div>` 
+                        : ''
+                    }
+                    ${hit.first_line ? 
+                        `<div class="hit-first-line">"${getHighlighted(hit, 'first_line')}"</div>` 
+                        : ''
+                    }
+                    ${hit.full_text ? 
+                        `<div class="hit-text">${getHighlighted(hit, 'full_text')}</div>` 
+                        : ''
+                    }
+                    ${hit.fragment_label ? 
+                        `<div style="margin-top: 10px; color: #888; font-size: 14px;">Фрагмент: ${hit.fragment_label}</div>` 
+                        : ''
+                    }
+                `;
+            }
+            
+            content += '</div>';
+            return content;
+        }
+        
+        function getHighlighted(hit, attribute) {
+            if (hit._highlightResult && hit._highlightResult[attribute]) {
+                return hit._highlightResult[attribute].value;
+            }
+            return hit[attribute] || '';
+        }
+        
+        function getPlural(num) {
+            if (num % 10 === 1 && num % 100 !== 11) return '';
+            if ([2, 3, 4].includes(num % 10) && ![12, 13, 14].includes(num % 100)) return 'а';
+            return 'ов';
+        }
+    </script>
+</body>
+</html>
