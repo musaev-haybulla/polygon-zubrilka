@@ -11,7 +11,7 @@ require_once __DIR__ . '/config.php';
 
 // Конфигурация Meilisearch
 $meilisearchConfig = [
-    'host' => 'http://localhost:7700',
+    'host' => 'https://testing.local:7701',
     'key' => 'SqNO0v-eMRxckMZnpcFla3fgEpiH5UQR9PGY-z2tLNg',
     'index' => 'content'
 ];
@@ -64,25 +64,59 @@ function generateNameVariants($firstName, $middleName, $lastName) {
     return array_unique($variants);
 }
 
+// Функция для получения настроек CURL
+function getCurlOptions($url, $method = 'GET', $data = null, $headers = []) {
+    $options = [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_VERBOSE => false
+    ];
+
+    if ($method === 'POST') {
+        $options[CURLOPT_POST] = true;
+        if ($data !== null) {
+            $options[CURLOPT_POSTFIELDS] = $data;
+        }
+    } elseif ($method !== 'GET') {
+        $options[CURLOPT_CUSTOMREQUEST] = $method;
+    }
+
+    if (!empty($headers)) {
+        $options[CURLOPT_HTTPHEADER] = $headers;
+    }
+
+    return $options;
+}
+
 // Функция отправки данных в Meilisearch
 function sendToMeilisearch($documents, $meilisearchConfig) {
     $url = $meilisearchConfig['host'] . '/indexes/' . $meilisearchConfig['index'] . '/documents';
     
+    $headers = [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $meilisearchConfig['key']
+    ];
+    
     $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($documents, JSON_UNESCAPED_UNICODE),
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $meilisearchConfig['key']
-        ]
-    ]);
+    curl_setopt_array($ch, getCurlOptions(
+        $url,
+        'POST',
+        json_encode($documents, JSON_UNESCAPED_UNICODE),
+        $headers
+    ));
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
+    
+    if ($response === false) {
+        throw new Exception("Ошибка соединения с Meilisearch: $error");
+    }
     
     if ($httpCode !== 202) {
         throw new Exception("Ошибка отправки в Meilisearch: HTTP $httpCode, Response: $response");
@@ -179,21 +213,50 @@ try {
     
     $results = $pdo->query($poemsQuery)->fetchAll(PDO::FETCH_ASSOC);
     
-    // Получаем тексты и первые строки отдельными запросами
-    foreach ($results as &$row) {
+    // Собираем все fragment_id для батчевого получения строк
+    $fragmentIds = [];
+    foreach ($results as $row) {
         if ($row['fragment_id']) {
-            // Получаем все строки фрагмента
-            $linesQuery = "SELECT `text` FROM `lines` WHERE `fragment_id` = ? AND `deleted_at` IS NULL ORDER BY `line_number`";
-            $stmt = $pdo->prepare($linesQuery);
-            $stmt->execute([$row['fragment_id']]);
-            $lines = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            
+            $fragmentIds[] = $row['fragment_id'];
+        }
+    }
+    
+    // Получаем все строки одним запросом
+    $allLines = [];
+    if (!empty($fragmentIds)) {
+        $placeholders = str_repeat('?,', count($fragmentIds) - 1) . '?';
+        $allLinesQuery = "
+            SELECT fragment_id, text, line_number 
+            FROM `lines` 
+            WHERE fragment_id IN ($placeholders) AND deleted_at IS NULL 
+            ORDER BY fragment_id, line_number
+        ";
+        $stmt = $pdo->prepare($allLinesQuery);
+        $stmt->execute($fragmentIds);
+        $linesData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Группируем строки по fragment_id
+        foreach ($linesData as $line) {
+            $allLines[$line['fragment_id']][] = $line['text'];
+        }
+    }
+    
+    // Заполняем тексты в результатах
+    foreach ($results as &$row) {
+        if ($row['fragment_id'] && isset($allLines[$row['fragment_id']])) {
+            $lines = $allLines[$row['fragment_id']];
             $row['full_text'] = implode("\n", $lines);
             $row['first_line'] = isset($lines[0]) ? $lines[0] : '';
         } else {
             $row['full_text'] = '';
             $row['first_line'] = '';
         }
+    }
+    
+    // Предварительно создаем индекс авторов для быстрого поиска
+    $authorsIndex = [];
+    foreach ($authors as $author) {
+        $authorsIndex[$author['id']] = $author;
     }
     
     $processedPoems = [];
@@ -203,18 +266,14 @@ try {
         $authorName = $row['author_name'];
         $authorVariants = [];
         
-        // Получаем варианты имени автора
-        if ($row['author_id']) {
-            foreach ($authors as $author) {
-                if ($author['id'] == $row['author_id']) {
-                    $authorVariants = generateNameVariants(
-                        $author['first_name'],
-                        $author['middle_name'],
-                        $author['last_name']
-                    );
-                    break;
-                }
-            }
+        // Получаем варианты имени автора из индекса
+        if ($row['author_id'] && isset($authorsIndex[$row['author_id']])) {
+            $author = $authorsIndex[$row['author_id']];
+            $authorVariants = generateNameVariants(
+                $author['first_name'],
+                $author['middle_name'],
+                $author['last_name']
+            );
         }
         
         // Для крупных произведений создаем отдельный документ (только один раз)
