@@ -404,7 +404,7 @@
                     },
                     body: JSON.stringify({
                         q: query,
-                        attributesToHighlight: ['name', 'title', 'author_name', 'first_line'],
+                        attributesToHighlight: ['name', 'title', 'author_name', 'first_line', 'full_text'],
                         highlightPreTag: '<span class="suggestion-highlight">',
                         highlightPostTag: '</span>',
                         limit: 8
@@ -423,17 +423,31 @@
         
         function displaySuggestions(hits, query) {
             const container = document.getElementById('suggestionsContainer');
-            currentSuggestions = hits;
+            const highlightTag = 'suggestion-highlight';
+
+            // Фильтруем результаты: показываем только те, где есть явная подсветка
+            const filteredHits = hits.filter(hit => {
+                if (!hit._formatted) return false;
+                // Проверяем все поля в _formatted на наличие подсветки
+                for (const key in hit._formatted) {
+                    if (typeof hit._formatted[key] === 'string' && hit._formatted[key].includes(highlightTag)) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            currentSuggestions = filteredHits;
             currentSuggestionIndex = -1;
             
-            if (hits.length === 0) {
+            if (filteredHits.length === 0) {
                 hideSuggestions();
                 return;
             }
             
             let html = '';
             
-            hits.forEach((hit, index) => {
+            filteredHits.forEach((hit, index) => {
                 const icon = getSuggestionIcon(hit.type);
                 const title = getSuggestionTitle(hit);
                 const subtitle = getSuggestionSubtitle(hit.type);
@@ -474,11 +488,33 @@
             if (hit.type === 'author') {
                 return getHighlighted(hit, 'name') || hit.name;
             } else {
+                // Основной заголовок (всегда есть)
                 let title = getHighlighted(hit, 'title') || hit.title;
                 if (hit.author_name) {
                     title += ` — ${getHighlighted(hit, 'author_name') || hit.author_name}`;
                 }
-                return title;
+                
+                let context = '';
+                const highlightTag = 'suggestion-highlight';
+
+                // Приоритет 1: первая строка
+                if (hit._formatted?.first_line?.includes(highlightTag)) {
+                    context = `<div style="margin-top:4px; font-size:0.9em; color:#555;">${hit._formatted.first_line}</div>`;
+                } 
+                // Приоритет 2: полный текст
+                else if (hit._formatted?.full_text?.includes(highlightTag)) {
+                    const value = hit._formatted.full_text;
+                    const match = value.match(/(.{0,25})<span[^>]*suggestion-highlight[^>]*>(.*?)<\/span>(.{0,25})/i);
+                    if (match) {
+                        let fragment = '';
+                        if (match[1].length === 25) fragment += '…';
+                        fragment += match[1] + '<span class="suggestion-highlight">' + match[2] + '</span>' + match[3];
+                        if (match[3].length === 25) fragment += '…';
+                        context = `<div style="margin-top:4px; font-size:0.9em; color:#555;"><b>В тексте:</b> ${fragment}</div>`;
+                    }
+                }
+                
+                return title + context;
             }
         }
         
@@ -644,8 +680,8 @@
             if (hit.type === 'author') {
                 content += `
                     <div class="hit-title">${getHighlighted(hit, 'name')}</div>
-                    ${hit._highlightResult?.name_variants ? 
-                        `<div class="hit-author">Варианты: ${hit._highlightResult.name_variants.map(v => v.value).join(', ')}</div>` 
+                    ${hit._formatted?.name_variants ? 
+                        `<div class="hit-author">Варианты: ${hit._formatted.name_variants.map(v => v.value).join(', ')}</div>` 
                         : ''
                     }
                 `;
@@ -676,8 +712,8 @@
         }
         
         function getHighlighted(hit, attribute) {
-            if (hit._highlightResult && hit._highlightResult[attribute]) {
-                return hit._highlightResult[attribute].value;
+            if (hit._formatted && hit._formatted[attribute]) {
+                return hit._formatted[attribute];
             }
             return hit[attribute] || '';
         }
