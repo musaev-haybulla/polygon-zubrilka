@@ -69,9 +69,22 @@
         
         .suggestion-icon {
             margin-right: 12px;
-            width: 20px;
+            width: 24px;
+            height: 24px;
             text-align: center;
-            opacity: 0.6;
+            opacity: 0.8;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        .suggestion-item:hover .suggestion-icon {
+            transform: scale(1.1);
+            background: #e9ecef;
         }
         
         .suggestion-content {
@@ -476,12 +489,15 @@
         }
         
         function getSuggestionIcon(type) {
-            switch(type) {
-                case 'author': return '👨‍🎨';
-                case 'poem_large': return '📚';
-                case 'poem_small': return '📝';
-                default: return '🔍';
-            }
+            const icons = {
+                author: ['👨‍🎨', '👩‍🎨', '✍️', '📝', '🖋️'],
+                poem_large: ['📚', '📖', '📗', '📘', '📙'],
+                poem_small: ['📝', '✏️', '📜', '📄', '📃']
+            };
+            
+            const typeIcons = icons[type] || ['🔍'];
+            const randomIndex = Math.floor(Math.random() * typeIcons.length);
+            return typeIcons[randomIndex];
         }
         
         function getSuggestionTitle(hit) {
