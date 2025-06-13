@@ -10,25 +10,8 @@ if (APP_ENV === 'development') {
     error_reporting(E_ALL);
 }
 
-/**
- * Логирование сообщений в файл
- * @param string $msg Сообщение для логирования
- */
-function logMsg(string $msg): void {
-    $time = date('Y-m-d H:i:s');
-    $logFile = LOGS_DIR . '/poem_import.log';
-    
-    // Создаем директорию для логов, если её нет
-    if (!is_dir(LOGS_DIR)) {
-        mkdir(LOGS_DIR, 0755, true);
-    }
-    
-    file_put_contents($logFile, "[$time] $msg\n", FILE_APPEND);
-}
-
-$pdo    = getPdo();
+$pdo = getPdo();
 $userId = (int)($_SESSION['user_id'] ?? 0);
-logMsg("Начало обработки. UserID={$userId}");
 
 // Сбор данных
 $title       = trim($_POST['title']        ?? '');
@@ -71,7 +54,6 @@ if ($sortOrder < 0) {
 }
 
 if (!empty($errors)) {
-    logMsg("Ошибка валидации: " . implode(", ", $errors));
     die('Неверные данные. ' . implode(" ", $errors));
 }
 
@@ -97,7 +79,7 @@ foreach ($rawAuthors as $entry) {
             $stmt->execute([':f' => $first, ':m' => $middle, ':l' => $last]);
             $authorIds[] = (int)$pdo->lastInsertId();
         } catch (PDOException $e) {
-            logMsg("Ошибка создания автора '{$entry}': " . $e->getMessage());
+            // Ошибка создания автора
         }
     }
 }
@@ -105,7 +87,6 @@ $authorIds = array_unique($authorIds);
 
 try {
     $pdo->beginTransaction();
-    logMsg("BEGIN TRANSACTION");
 
     // Создаем новое стихотворение, если не указано существующее
     if ($poemId === 0) {
@@ -247,6 +228,6 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    logMsg("Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+    // Ошибка выполнения транзакции
     die('Произошла ошибка при сохранении. Пожалуйста, попробуйте позже.');
 }

@@ -59,6 +59,5 @@ try {
     
 } catch (PDOException $e) {
     http_response_code(500);
-    error_log("Database error in authors_autocomplete.php: " . $e->getMessage());
     echo json_encode(['error' => 'Ошибка при выполнении запроса']);
 }

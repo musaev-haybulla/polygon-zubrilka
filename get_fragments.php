@@ -47,14 +47,10 @@ try {
     ]);
     
 } catch (PDOException $e) {
-    // Логируем ошибку
-    error_log("Error in get_fragments.php: " . $e->getMessage());
-    
     // Возвращаем ошибку
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Ошибка при получении фрагментов',
-        'debug' => APP_ENV === 'development' ? $e->getMessage() : null
+        'error' => 'Ошибка при получении фрагментов'
     ]);
 }
