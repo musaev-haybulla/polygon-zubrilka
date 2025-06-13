@@ -1,7 +1,21 @@
 <?php
 declare(strict_types=1);
-require 'config.php';
-$pdo = getPdo();
+
+// Подключаем конфигурацию
+require __DIR__ . '/config/config.php';
+
+// Настройка отображения ошибок для разработки
+if (APP_ENV === 'development') {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+}
+
+// Подключаемся к БД
+try {
+    $pdo = getPdo();
+} catch (PDOException $e) {
+    die("Ошибка подключения к базе данных: " . $e->getMessage());
+}
 
 // Получаем список авторов
 $authors = $pdo->query(

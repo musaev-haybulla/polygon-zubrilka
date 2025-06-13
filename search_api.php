@@ -1,28 +1,74 @@
 <?php
+/**
+ * API для поиска стихотворений
+ */
 declare(strict_types=1);
-require_once 'config.php';
 
-// Включаем вывод ошибок PHP для отладки
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+// Включаем буферизацию вывода
+ob_start();
+
+// Функция для логирования
+function logDebug(string $message, array $data = []): void {
+    $logFile = __DIR__ . '/logs/search_debug.log';
+    $time = date('Y-m-d H:i:s');
+    $logMessage = "[$time] $message";
+    
+    if (!empty($data)) {
+        $logMessage .= "\n" . json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+    
+    $logMessage .= "\n\n";
+    file_put_contents($logFile, $logMessage, FILE_APPEND);
+}
+
+// Очищаем предыдущий лог-файл при первом запуске
+if (!isset($GLOBALS['log_initialized'])) {
+    $GLOBALS['log_initialized'] = true;
+    file_put_contents(__DIR__ . '/logs/search_debug.log', '');
+}
+
+logDebug('=== НОВЫЙ ЗАПРОС ===', $_GET);
+
+// Подключаем конфигурацию
+logDebug('Подключаем конфигурацию');
+require __DIR__ . '/config/config.php';
+
+// Настройка заголовков ответа
+header('Content-Type: application/json; charset=UTF-8');
+
+// Настройка отображения ошибок для разработки
+if (APP_ENV === 'development') {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+}
+
+// Настройка логгирования
+ini_set('log_errors', 1);
+ini_set('error_log', LOGS_DIR . '/php_errors.log');
+
+logDebug('Конфигурация загружена', [
+    'APP_ENV' => APP_ENV,
+    'DB_HOST' => DB_HOST,
+    'DB_NAME' => DB_NAME,
+    'LOGS_DIR' => defined('LOGS_DIR') ? LOGS_DIR : 'не определено'
+]);
 
 // Получаем поисковый запрос
 $query = isset($_GET['query']) ? trim($_GET['query']) : '';
+logDebug('Получен поисковый запрос', ['query' => $query]);
 
-// Создаём лог для отладки
-file_put_contents('search_log.txt', date('Y-m-d H:i:s') . " Запрос: {$query}\n", FILE_APPEND);
-
-header('Content-Type: application/json');
 header('Cache-Control: no-cache, must-revalidate');
 
 // Проверяем, что запрос не пустой
 if (empty($query) || strlen($query) < 2) {
-    echo json_encode([]);
+    logDebug('Пустой запрос или слишком короткий');
+    echo json_encode(['success' => false, 'error' => 'Слишком короткий поисковый запрос']);
     exit;
 }
 
 // Подготавливаем поисковую строку для SQL LIKE
 $searchTerm = '%' . $query . '%';
+logDebug('Подготовлен поисковый термин', ['searchTerm' => $searchTerm]);
 
 // Функция для получения первых двух строк стихотворения
 function getFirstTwoLines($pdo, $poemId) {

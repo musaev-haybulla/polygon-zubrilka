@@ -6,14 +6,14 @@
 
 declare(strict_types=1);
 
-// Подключаем конфиг БД
-require_once __DIR__ . '/config.php';
+// Подключаем конфигурацию
+require_once __DIR__ . '/config/config.php';
 
 // Конфигурация Meilisearch
 $meilisearchConfig = [
-    'host' => 'https://testing.local:7701',
-    'key' => 'SqNO0v-eMRxckMZnpcFla3fgEpiH5UQR9PGY-z2tLNg',
-    'index' => 'content'
+    'host'  => MEILISEARCH_HOST,
+    'key'   => MEILISEARCH_KEY,
+    'index' => MEILISEARCH_INDEX
 ];
 
 // Получаем подключение к БД

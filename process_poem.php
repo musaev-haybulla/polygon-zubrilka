@@ -1,11 +1,29 @@
 <?php
 declare(strict_types=1);
-require 'config.php';
 
-/** Простое логирование */
+// Подключаем конфигурацию
+require __DIR__ . '/config/config.php';
+
+// Настройка отображения ошибок для разработки
+if (APP_ENV === 'development') {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+}
+
+/**
+ * Логирование сообщений в файл
+ * @param string $msg Сообщение для логирования
+ */
 function logMsg(string $msg): void {
     $time = date('Y-m-d H:i:s');
-    file_put_contents(__DIR__ . '/poem_import.log', "[$time] $msg\n", FILE_APPEND);
+    $logFile = LOGS_DIR . '/poem_import.log';
+    
+    // Создаем директорию для логов, если её нет
+    if (!is_dir(LOGS_DIR)) {
+        mkdir(LOGS_DIR, 0755, true);
+    }
+    
+    file_put_contents($logFile, "[$time] $msg\n", FILE_APPEND);
 }
 
 $pdo    = getPdo();

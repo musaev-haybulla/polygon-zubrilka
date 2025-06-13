@@ -1,9 +1,20 @@
 <?php
-// authors_autocomplete.php
+/**
+ * Автодополнение для авторов
+ */
 declare(strict_types=1);
-require 'config.php';
 
+// Подключаем конфигурацию
+require __DIR__ . '/config/config.php';
+
+// Настройка заголовков ответа
 header('Content-Type: application/json; charset=UTF-8');
+
+// Настройка отображения ошибок для разработки
+if (APP_ENV === 'development') {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+}
 
 $q = trim((string)($_GET['q'] ?? ''));
 if ($q === '' || mb_strlen($q) < 2) {
@@ -11,7 +22,13 @@ if ($q === '' || mb_strlen($q) < 2) {
     exit;
 }
 
-$pdo = getPdo();
+try {
+    $pdo = getPdo();
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Ошибка подключения к базе данных']);
+    exit;
+}
 
 // Используем MATCH...AGAINST для релевантности + LIKE для подстановки
 $sql = "
@@ -30,10 +47,18 @@ $sql = "
   LIMIT 10
 ";
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute([
-    ':query' => $q,
-    ':like'  => "%{$q}%"
-]);
-
-echo json_encode($stmt->fetchAll());
+try {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':query' => $q,
+        ':like'  => "%{$q}%"
+    ]);
+    
+    $result = $stmt->fetchAll();
+    echo json_encode($result);
+    
+} catch (PDOException $e) {
+    http_response_code(500);
+    error_log("Database error in authors_autocomplete.php: " . $e->getMessage());
+    echo json_encode(['error' => 'Ошибка при выполнении запроса']);
+}
