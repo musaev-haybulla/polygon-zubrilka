@@ -129,16 +129,11 @@ $fragments = [];
 
             <div>
                 <label class="block mb-1">Порядок вставки</label>
-                <select name="sort_order" class="w-full border rounded px-3 py-2" x-html="sortOrderOptions">
-                    <option value="0">Сделать первым</option>
-                    <?php foreach ($fragments as $fragment): ?>
-                        <option value="<?= $fragment['sort_order'] + 1 ?>">
-                            После "<?= htmlspecialchars(
-                                $fragment['label']
-                                ?: preg_replace('/[.,!?;:]+$/u', '', $fragment['first_line']) . '...'
-                            ) ?>"
-                        </option>
-                    <?php endforeach; ?>
+                <select name="sort_order" x-model="selectedSortOrder" class="w-full border rounded px-3 py-2">
+                    <option value="1">Сделать первым</option>
+                    <template x-for="fragment in fragments" :key="fragment.id">
+                        <option :value="parseInt(fragment.sort_order) + 1" x-text="'После ' + getFragmentLabel(fragment)"></option>
+                    </template>
                 </select>
             </div>
 
@@ -176,8 +171,9 @@ document.addEventListener('alpine:init', () => {
         authorIds: [],
         canSubmit: false,
         debugInfo: '',
-        fragments: <?= json_encode($fragments) ?>,
-        selectedPoemId: 0,  // Всегда начинаем с 0, так как больше не используем poem_id из URL
+        fragments: [],
+        selectedPoemId: 0,
+        selectedSortOrder: 1, // Значение по умолчанию для порядка вставки
         fragmentGrade: 'secondary',
         
         async init() {
@@ -247,53 +243,79 @@ document.addEventListener('alpine:init', () => {
         handlePoemSelect() {
             const selectElement = document.querySelector('#poem-select');
             const selectedOption = selectElement.options[selectElement.selectedIndex];
-            
+
+            this.fragments = []; // Всегда сбрасываем фрагменты при изменении
+
             if (selectedOption && selectedOption.dataset.poemId) {
-                // Выбрано существующее стихотворение
-                this.selectedPoemId = parseInt(selectedOption.dataset.poemId);
-                this.newPoemTitle = ''; // Сбрасываем новое название
-                this.fetchFragments();
-            } else if (this.poemTitle) {
-                // Введено новое название
-                this.selectedPoemId = 0;
-                this.fragments = [];
-            } else {
-                // Ничего не выбрано
-                this.selectedPoemId = 0;
-                this.newPoemTitle = '';
-                this.fragments = [];
-            }
-            
-            this.validate();
-        },
-        
-        onPoemSelect(event) {
-            if (!event || !event.target) return;
-            
-            const poemId = event.target.value || '';
-            this.selectedPoemId = parseInt(poemId) || 0;
-            
-            if (this.selectedPoemId) {
-                // Загружаем фрагменты для выбранного стихотворения
+                this.selectedPoemId = parseInt(selectedOption.dataset.poemId, 10);
+
                 fetch(`get_fragments.php?poem_id=${this.selectedPoemId}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
-                        this.fragments = data || [];
+                        if (data && data.success && Array.isArray(data.data)) {
+                            this.fragments = data.data;
+                        } else {
+                            this.fragments = [];
+                        }
+                        this.updateFragmentOrder();
                         this.validate();
                     })
                     .catch(error => {
                         console.error('Ошибка при загрузке фрагментов:', error);
                         this.fragments = [];
+                        this.updateFragmentOrder();
                         this.validate();
                     });
             } else {
-                this.fragments = [];
+                // Обработка нового стихотворения или сброса выбора
+                this.selectedPoemId = 0;
+                this.updateFragmentOrder();
                 this.validate();
             }
         },
         
+        escapeHtml(str) {
+            if (typeof str !== 'string') return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        },
+
+        // Получает отображаемое название для фрагмента
+        getFragmentLabel(fragment) {
+            if (fragment.label) {
+                return '"' + this.escapeHtml(fragment.label) + '"';
+            }
+            if (fragment.first_line) {
+                return '"' + this.escapeHtml(fragment.first_line.replace(/[.,!?;:]+$/u, '') + '...') + '"';
+            }
+            return '"Фрагмент ' + (fragment.sort_order + 1) + '"';
+        },
+        
+        // Обновляет порядок вставки по умолчанию
+        updateFragmentOrder() {
+            this.$nextTick(() => {
+                if (this.fragments && this.fragments.length > 0) {
+                    // По умолчанию — вставить после последнего фрагмента
+                    const maxSortOrder = Math.max(...this.fragments.map(f => parseInt(f.sort_order)));
+                    this.selectedSortOrder = maxSortOrder + 1;
+                } else {
+                    // Если фрагментов нет, по умолчанию — сделать первым
+                    this.selectedSortOrder = 1;
+                }
+            });
+        },
+        
         validate() {
-            const poemText = document.querySelector('textarea[name="poem_text"]').value.trim();
+            const poemText = document.querySelector('textarea[name="poem_text"]')?.value.trim() || '';
             
             if (this.selectedPoemId > 0) {
                 // Выбрано существующее стихотворение
@@ -316,31 +338,6 @@ document.addEventListener('alpine:init', () => {
         // Вызываем валидацию при изменении текста
         checkText() {
             this.validate();
-        },
-        
-        get sortOrderOptions() {
-            if (!this.fragments || this.fragments.length === 0) {
-                return '<option value="0">Сделать первым</option>';
-            }
-            
-            let options = '<option value="0">Сделать первым</option>';
-            this.fragments.forEach((frag, index) => {
-                const label = frag.label
-                    ? frag.label
-                    : frag.first_line.replace(/[.,!?;:]+$/u, '') + '...';
-                const value = frag.sort_order + 1;
-                options += `<option value="${value}">После "${this.escapeHtml(label)}"</option>`;
-            });
-            return options;
-        },
-        
-        escapeHtml(unsafe) {
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
         },
         
         async fetchFragments() {

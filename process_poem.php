@@ -98,7 +98,6 @@ try {
         );
         $stmt->execute([':o' => $userId, ':t' => $title, ':d' => $isDivided]);
         $poemId = (int)$pdo->lastInsertId();
-        logMsg("Created new poem_id={$poemId}, is_divided={$isDivided}");
     }
 
     // Определяем sort_order для нового фрагмента
@@ -139,7 +138,6 @@ try {
             ':g'  => $grade
         ]);
         $fragmentId = (int)$pdo->lastInsertId();
-        logMsg("Created new fragment_id={$fragmentId}");
     } else {
         $stmt = $pdo->prepare(
             "UPDATE fragments 
@@ -217,8 +215,6 @@ try {
     }
 
     $pdo->commit();
-    logMsg("COMMIT successful for poem_id={$poemId}, fragment_id={$fragmentId}");
-
     // Редирект обратно на форму с сообщением об успехе
     $redirect = isset($_POST['is_divided']) ? 'add_poem_fragment.php' : 'add_simple_poem.php';
     header("Location: {$redirect}?success=1");
@@ -228,6 +224,9 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    // Ошибка выполнения транзакции
-    die('Произошла ошибка при сохранении. Пожалуйста, попробуйте позже.');
+    
+    // Просто выводим сообщение об ошибке
+    die('Ошибка: ' . htmlspecialchars($e->getMessage()) . 
+        ' в файле ' . htmlspecialchars($e->getFile()) . 
+        ' на строке ' . $e->getLine());
 }
