@@ -1,4 +1,5 @@
 data.sql
 backup.sql
 search_log.txt
-poem_import.log.DS_Store
+poem_import.log
+.DS_Store
