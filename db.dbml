@@ -57,7 +57,33 @@ Table poem_authors {
   author_id  bigint      [pk, not null]
 }
 
+Table audio_tracks {
+  id              bigint        [pk, increment, not null]
+  fragment_id     bigint        [not null]
+  file_path       varchar(500)  [not null]
+  duration        decimal(8,3)  [not null]
+  is_ai_generated boolean       [not null]
+  title           varchar(255)  [not null]
+  is_default      boolean       [not null]
+  created_at      datetime      [not null]
+  updated_at      datetime      [not null]
+  deleted_at      datetime
+}
 
-// Внешние ключи
+Table audio_timings {
+  id              bigint        [pk, increment, not null]
+  audio_track_id  bigint        [not null]
+  line_id         bigint        [not null]
+  end_time        decimal(8,3)  [not null]
+  created_at      datetime      [not null]
+  updated_at      datetime      [not null]
+}
+
+# Внешние ключи
+Ref: audio_tracks.fragment_id > fragments.id [delete: cascade]
+Ref: audio_timings.audio_track_id > audio_tracks.id [delete: cascade]
+Ref: audio_timings.line_id > lines.id [delete: cascade]
 Ref: poem_authors.author_id > authors.id [delete: cascade]
 Ref: poem_authors.poem_id > poems.id [delete: cascade]
+Ref: fragments.poem_id > poems.id [delete: cascade]
+Ref: lines.fragment_id > fragments.id [delete: cascade]
