@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     searchInput.addEventListener('input', function() {
         const value = this.value.toLowerCase().trim();
         if (value.includes('евгений') || value.includes('онегин')) {
-            console.log('Обнаружен ввод "Евгений Онегин"');
+            // Обнаружен ввод "Евгений Онегин"
         }
     });
 
@@ -32,29 +32,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show loading indicator
         resultsContainer.innerHTML = '<p>Поиск...</p>';
         
-        console.log('Запрос поиска:', query);
-        
         // Стандартный запрос через API для всех поисковых запросов
         fetch('search_api.php?query=' + encodeURIComponent(query))
             .then(response => {
-                console.log('Статус ответа:', response.status);
                 return response.text();
             })
             .then(text => {
-                console.log('Ответ сервера:', text);
                 try {
                     return text ? JSON.parse(text) : [];
                 } catch (e) {
-                    console.error('Ошибка JSON:', e);
                     throw new Error('Неверный формат данных');
                 }
             })
             .then(data => {
-                console.log('Обработанные данные:', data);
                 displayResults(data);
             })
             .catch(error => {
-                console.error('Ошибка:', error);
                 resultsContainer.innerHTML = '<p class="no-results">Произошла ошибка при поиске. Пожалуйста, попробуйте еще раз.</p>';
             });
     }

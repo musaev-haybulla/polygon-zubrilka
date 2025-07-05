@@ -4,8 +4,9 @@
  */
 declare(strict_types=1);
 
-// Подключаем конфигурацию
+// Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
+require __DIR__ . '/classes/autoload.php';
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
@@ -14,40 +15,14 @@ if (APP_ENV === 'development') {
 }
 
 try {
-    // Получаем подключение к БД
-    $pdo = getPdo();
-    
     // Получаем все фрагменты (отдельные стихи) с их данными
-    $sql = "
-        SELECT 
-            f.id AS fragment_id,
-            f.label AS fragment_label,
-            f.grade_level,
-            f.sort_order,
-            p.id AS poem_id,
-            p.title AS poem_title,
-            p.year_written,
-            GROUP_CONCAT(DISTINCT CONCAT_WS(' ', a.first_name, a.middle_name, a.last_name) SEPARATOR ', ') AS authors,
-            GROUP_CONCAT(DISTINCT l.text ORDER BY l.line_number SEPARATOR '<br>') AS fragment_text,
-            COUNT(DISTINCT at.id) AS audio_count,
-            GROUP_CONCAT(DISTINCT at.title SEPARATOR '|') AS audio_titles,
-            GROUP_CONCAT(DISTINCT at.is_ai_generated SEPARATOR '|') AS audio_types
-        FROM `fragments` f
-        LEFT JOIN `poems` p ON f.poem_id = p.id
-        LEFT JOIN `poem_authors` pa ON p.id = pa.poem_id
-        LEFT JOIN `authors` a ON pa.author_id = a.id
-        LEFT JOIN `lines` l ON f.id = l.fragment_id
-        LEFT JOIN `audio_tracks` at ON f.id = at.fragment_id AND at.deleted_at IS NULL
-        WHERE f.deleted_at IS NULL 
-        AND p.deleted_at IS NULL
-        AND (l.deleted_at IS NULL OR l.id IS NULL)
-        GROUP BY f.id
-        ORDER BY p.title, f.sort_order
-    ";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $query = new FragmentQuery();
+    $results = $query
+        ->withPoems()
+        ->withAuthors() 
+        ->withLines()
+        ->withAudio()
+        ->get();
     
     // Обрабатываем результаты - каждый фрагмент как отдельный стих
     $poems = [];
@@ -55,16 +30,16 @@ try {
         $audioCount = (int)$row['audio_count'];
         
         // Определяем заголовок стиха
-        $poemTitle = $row['fragment_label'] ?: $row['poem_title'];
-        if ($row['fragment_label'] && $row['poem_title']) {
-            $poemTitle = $row['poem_title'] . ' - ' . $row['fragment_label'];
+        $poemTitle = $row['label'] ?: $row['poem_title'];
+        if ($row['label'] && $row['poem_title']) {
+            $poemTitle = $row['poem_title'] . ' - ' . $row['label'];
         }
         
         $poems[] = [
             'id' => $row['fragment_id'],
             'title' => $poemTitle,
             'poem_title' => $row['poem_title'],
-            'fragment_label' => $row['fragment_label'],
+            'fragment_label' => $row['label'],
             'year_written' => $row['year_written'],
             'authors' => $row['authors'] ?? 'Неизвестный автор',
             'grade_level' => $row['grade_level'],

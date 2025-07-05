@@ -1,8 +1,9 @@
 <?php
 declare(strict_types=1);
 
-// Подключаем конфигурацию
+// Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
+require __DIR__ . '/classes/autoload.php';
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
@@ -10,27 +11,15 @@ if (APP_ENV === 'development') {
     error_reporting(E_ALL);
 }
 
-// Подключаемся к БД
 try {
-    $pdo = getPdo();
+    // Получаем список авторов
+    $authors = DatabaseHelper::getAllAuthors();
+
+    // Получаем список существующих разделенных стихотворений
+    $poems = DatabaseHelper::getDividedPoems();
 } catch (PDOException $e) {
     die("Ошибка подключения к базе данных: " . $e->getMessage());
 }
-
-// Получаем список авторов
-$authors = $pdo->query(
-    "SELECT id, CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name 
-     FROM authors 
-     ORDER BY full_name"
-)->fetchAll();
-
-// Получаем список существующих разделенных стихотворений
-$poems = $pdo->query(
-    "SELECT id, title 
-     FROM poems 
-     WHERE is_divided = 1 
-     ORDER BY title"
-)->fetchAll();
 
 // Инициализируем пустой массив фрагментов
 $fragments = [];
