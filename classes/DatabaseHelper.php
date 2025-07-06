@@ -247,6 +247,6 @@ class DatabaseHelper
         $lines = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
         // Всегда возвращаем массив из 2 элементов
-        return array_pad($lines, 2, '');
+                return array_pad($lines, 2, '');
     }
 }

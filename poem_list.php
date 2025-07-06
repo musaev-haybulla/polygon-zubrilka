@@ -7,6 +7,7 @@ declare(strict_types=1);
 // Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
+require __DIR__ . '/config/poem_size_config.php';
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
@@ -22,6 +23,7 @@ try {
         ->withAuthors() 
         ->withLines()
         ->withAudio()
+        ->withSortingFields()
         ->get();
     
     // Обрабатываем результаты - каждый фрагмент как отдельный стих
@@ -35,6 +37,13 @@ try {
             $poemTitle = $row['poem_title'] . ' - ' . $row['label'];
         }
         
+        // Получаем количество строк из базы данных
+        $lineCount = (int)($row['line_count'] ?? 0);
+        
+        // Определяем размер стихотворения
+        $poemSize = getPoemSize($lineCount);
+
+        
         $poems[] = [
             'id' => $row['fragment_id'],
             'title' => $poemTitle,
@@ -45,6 +54,8 @@ try {
             'grade_level' => $row['grade_level'],
             'sort_order' => $row['sort_order'],
             'text' => $row['fragment_text'],
+            'line_count' => $lineCount,
+            'size' => $poemSize,
             'audio_count' => $audioCount,
             'has_audio' => $audioCount > 0,
             'audio_titles' => $row['audio_titles'] ? explode('|', $row['audio_titles']) : [],
@@ -87,6 +98,16 @@ function getGradeFilterValue($grade) {
         case 'middle': return 'middle';
         case 'secondary': return 'senior';
         default: return 'all';
+    }
+}
+
+// Функция для получения класса бейджа размера стихотворения
+function getPoemSizeClass($size) {
+    switch ($size) {
+        case 'short': return 'bg-success text-white';
+        case 'medium': return 'bg-warning text-dark';
+        case 'large': return 'bg-danger text-white';
+        default: return 'bg-light text-dark';
     }
 }
 ?>
@@ -194,9 +215,9 @@ function getGradeFilterValue($grade) {
         <label class="form-label">Размер</label>
         <select class="form-select" x-model="selectedSize">
           <option value="all">Все размеры</option>
-          <option value="large">Крупный</option>
-          <option value="medium">Средний</option>
-          <option value="small">Маленький</option>
+          <option value="large">Крупные</option>
+          <option value="medium">Средние</option>
+          <option value="short">Короткие</option>
         </select>
       </div>
       <div class="col-md-3">
@@ -223,7 +244,7 @@ function getGradeFilterValue($grade) {
     <div class="col-12" 
          data-has-voiceovers="<?= $poem['has_audio'] ? 'true' : 'false' ?>" 
          data-age-group="<?= htmlspecialchars(getGradeFilterValue($poem['grade_level'])) ?>" 
-         data-size="medium" 
+         data-size="<?= htmlspecialchars($poem['size']) ?>" 
          x-show="isVisible($el)">
       <div class="flat-card" x-data="{ expanded: false }">
         <div class="poem-content">
@@ -233,7 +254,7 @@ function getGradeFilterValue($grade) {
             <span class="badge <?= getGradeClass($poem['grade_level']) ?>">
               <?= getGradeName($poem['grade_level']) ?>
             </span>
-            <span class="badge bg-warning text-dark">Средний</span>
+            <span class="badge <?= getPoemSizeClass($poem['size']) ?>"><?= htmlspecialchars(getPoemSizeLabel($poem['size'])) ?></span>
           </div>
           <div class="poem-text fst-italic">
             <?php 

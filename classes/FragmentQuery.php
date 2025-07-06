@@ -82,6 +82,7 @@ class FragmentQuery
     public function withLines(): self 
     {
         $this->select[] = "GROUP_CONCAT(DISTINCT l.text ORDER BY l.line_number SEPARATOR '<br>') AS fragment_text";
+        $this->select[] = "COUNT(DISTINCT l.id) AS line_count";
         
         $this->joins[] = 'LEFT JOIN `lines` l ON f.id = l.fragment_id';
         $this->where[] = '(l.deleted_at IS NULL OR l.id IS NULL)';
@@ -89,6 +90,29 @@ class FragmentQuery
         if (!in_array('f.id', $this->groupBy)) {
             $this->groupBy[] = 'f.id';
         }
+        
+        return $this;
+    }
+    
+    /**
+     * Добавить поля для сортировки по возрасту и размеру
+     */
+    public function withSortingFields(): self 
+    {
+        // Приоритет возрастной группы: младшие(1), средние(2), старшие(3)
+        $this->select[] = "CASE 
+            WHEN f.grade_level = 'primary' THEN 1
+            WHEN f.grade_level = 'middle' THEN 2  
+            WHEN f.grade_level = 'secondary' THEN 3
+            ELSE 4 
+        END AS grade_priority";
+        
+        // Приоритет размера: короткие(1), средние(2), крупные(3)
+        $this->select[] = "CASE 
+            WHEN COUNT(DISTINCT l.id) <= 8 THEN 1
+            WHEN COUNT(DISTINCT l.id) <= 20 THEN 2
+            ELSE 3 
+        END AS size_priority";
         
         return $this;
     }
@@ -214,8 +238,18 @@ class FragmentQuery
         if (!empty($this->orderBy)) {
             $sql .= ' ORDER BY ' . implode(', ', $this->orderBy);
         } else {
-            // Сортировка по умолчанию
-            if (in_array('p.title AS poem_title', $this->select)) {
+            // Сортировка по умолчанию: сначала по возрастной группе, затем по размеру
+            $hasGradePriority = false;
+            $hasSizePriority = false;
+            
+            foreach ($this->select as $field) {
+                if (strpos($field, 'grade_priority') !== false) $hasGradePriority = true;
+                if (strpos($field, 'size_priority') !== false) $hasSizePriority = true;
+            }
+            
+            if ($hasGradePriority && $hasSizePriority) {
+                $sql .= ' ORDER BY grade_priority ASC, size_priority ASC, p.title ASC, f.sort_order ASC';
+            } elseif (in_array('p.title AS poem_title', $this->select)) {
                 $sql .= ' ORDER BY p.title, f.sort_order';
             } else {
                 $sql .= ' ORDER BY f.sort_order';
