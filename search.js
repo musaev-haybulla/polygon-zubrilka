@@ -139,9 +139,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 const meta = [
                     item.author && `Автор: <span class="font-medium">${item.author}</span>`
                 ].filter(Boolean).join(' • ');
-                
+
                 html += renderCard(
                     item.poem_title || 'Без названия',
+                    meta,
+                    renderLines(item.lines, 3),
+                    'line'
+                );
+
+            } else if (item.type === 'line') {
+                const meta = [
+                    item.author && `Автор: <span class="font-medium">${item.author}</span>`,
+                    item.year && `Год: <span class="font-medium">${item.year}</span>`
+                ].filter(Boolean).join(' • ');
+
+                html += renderCard(
+                    item.title || 'Без названия',
                     meta,
                     renderLines(item.lines, 3),
                     'line'

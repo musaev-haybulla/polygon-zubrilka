@@ -156,6 +156,7 @@ class SearchService
                     $lines = DatabaseHelper::getFirstLines($result['fragment_id']);
                     
                     $this->results[] = [
+                        'type' => 'line',
                         'id' => $result['poem_id'],
                         'title' => $result['poem_title'] . ($result['fragment_label'] ? ' - ' . $result['fragment_label'] : ''),
                         'author' => $result['author'] ?? 'Неизвестный автор',
