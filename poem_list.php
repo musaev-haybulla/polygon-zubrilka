@@ -253,11 +253,11 @@ function getPoemSizeClass($size) {
   <div class="row g-0">
     <?php foreach ($poems as $poem): ?>
     <div class="col-12" 
-         :data-has-voiceovers="audios.length > 0" 
+         data-has-voiceovers="<?= $poem['has_audio'] ? 'true' : 'false' ?>" 
          data-age-group="<?= htmlspecialchars(getGradeFilterValue($poem['grade_level'])) ?>" 
          data-size="<?= htmlspecialchars($poem['size']) ?>" 
          x-show="isVisible($el)">
-      <div class="flat-card" x-data="poemCard(<?= htmlspecialchars(json_encode($poem['audios'])) ?>)">
+      <div class="flat-card" x-data='poemCard(<?= json_encode($poem, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>
         <div class="poem-content">
           <h5 class="mb-1"><?= htmlspecialchars($poem['title']) ?></h5>
           <p class="text-muted mb-2"><?= htmlspecialchars($poem['authors']) ?></p>
@@ -290,7 +290,12 @@ function getPoemSizeClass($size) {
         <div class="voiceover-panel">
           <div class="voiceover-panel-header">
             <h6 class="mb-0 text-muted">Озвучки (<span x-text="audios.length"></span>)</h6>
-            <button class="icon-btn add-btn"><i class="bi bi-plus-lg"></i></button>
+            <button class="icon-btn add-btn" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#addAudioModal" 
+                    :data-bs-fragment-id="poem.id">
+              <i class="bi bi-plus-lg"></i>
+            </button>
           </div>
           
           <template x-if="audios.length > 0">
@@ -306,7 +311,7 @@ function getPoemSizeClass($size) {
                   </div>
                   <div>
                     <button class="icon-btn"><i class="bi bi-pencil"></i></button>
-                    <button class="icon-btn" @click="deleteAudio(audio.id, $event.currentTarget)"><i class="bi bi-trash"></i></button>
+                    <button class="icon-btn" @click="deleteAudio(audio.id)"><i class="bi bi-trash"></i></button>
                   </div>
                 </div>
               </template>
@@ -323,12 +328,58 @@ function getPoemSizeClass($size) {
   </div>
 </div>
 
+<!-- Модальное окно для добавления озвучки -->
+<div class="modal fade" id="addAudioModal" tabindex="-1" aria-labelledby="addAudioModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addAudioModalLabel">Добавить новую озвучку</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addAudioForm" action="add_audio_step1.php" method="POST" enctype="multipart/form-data">
+          <input type="hidden" id="fragmentId" name="fragmentId">
+          <div class="mb-3">
+            <label for="audioTitle" class="form-label">Название озвучки</label>
+            <input type="text" class="form-control" id="audioTitle" name="audioTitle" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Тип голоса</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="voiceType" id="liveVoice" value="0" checked>
+              <label class="form-check-label" for="liveVoice">Живой голос</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="voiceType" id="aiVoice" value="1">
+              <label class="form-check-label" for="aiVoice">ИИ-генерированный</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="audioFile" class="form-label">Аудиофайл</label>
+            <input class="form-control" type="file" id="audioFile" name="audioFile" accept="audio/*" required>
+          </div>
+          <div class="mb-3 form-check bg-light p-3 rounded">
+            <input type="checkbox" class="form-check-input" id="trimAudio" name="trimAudio" value="1">
+            <label class="form-check-label" for="trimAudio"><strong>Обрезать аудиофайл?</strong></label>
+            <small class="form-text text-muted d-block">Позволит на следующем шаге удалить тишину или лишние фрагменты в начале и конце озвучки.</small>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="submit" form="addAudioForm" class="btn btn-primary">Далее</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-function poemCard(initialAudios) {
+function poemCard(poemData) {
   return {
-    audios: initialAudios,
+    poem: poemData,
+    audios: poemData.audios,
     expanded: false,
-    deleteAudio(audioId, buttonElement) {
+    deleteAudio(audioId) {
       if (!audioId) {
         console.error('Не найден ID озвучки');
         return;
@@ -347,6 +398,7 @@ function poemCard(initialAudios) {
             if (index > -1) {
               this.audios.splice(index, 1);
             }
+            this.$el.closest('.col-12').dataset.hasVoiceovers = this.audios.length > 0 ? 'true' : 'false';
           } else {
             alert('Ошибка при удалении: ' + data.error);
           }
@@ -385,6 +437,17 @@ function filterData() {
     }
   }
 }
+
+const addAudioModal = document.getElementById('addAudioModal');
+if (addAudioModal) {
+    addAudioModal.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const fragmentId = button.getAttribute('data-bs-fragment-id');
+      const modalInput = addAudioModal.querySelector('#fragmentId');
+      modalInput.value = fragmentId;
+    });
+}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
