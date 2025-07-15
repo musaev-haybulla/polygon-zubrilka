@@ -43,6 +43,19 @@ try {
         // Определяем размер стихотворения
         $poemSize = getPoemSize($lineCount);
 
+        // Собираем структурированный массив озвучек
+        $audioIds = $row['audio_ids'] ? explode('|', $row['audio_ids']) : [];
+        $audioTitles = $row['audio_titles'] ? explode('|', $row['audio_titles']) : [];
+        $audioTypes = $row['audio_types'] ? explode('|', $row['audio_types']) : [];
+        
+        $audios = [];
+        for ($i = 0; $i < $audioCount; $i++) {
+            $audios[] = [
+                'id' => $audioIds[$i] ?? null,
+                'title' => $audioTitles[$i] ?? 'Озвучка',
+                'is_ai' => isset($audioTypes[$i]) && $audioTypes[$i] === '1'
+            ];
+        }
         
         $poems[] = [
             'id' => $row['fragment_id'],
@@ -56,10 +69,8 @@ try {
             'text' => $row['fragment_text'],
             'line_count' => $lineCount,
             'size' => $poemSize,
-            'audio_count' => $audioCount,
             'has_audio' => $audioCount > 0,
-            'audio_titles' => $row['audio_titles'] ? explode('|', $row['audio_titles']) : [],
-            'audio_types' => $row['audio_types'] ? explode('|', $row['audio_types']) : []
+            'audios' => $audios
         ];
     }
     
@@ -242,11 +253,11 @@ function getPoemSizeClass($size) {
   <div class="row g-0">
     <?php foreach ($poems as $poem): ?>
     <div class="col-12" 
-         data-has-voiceovers="<?= $poem['has_audio'] ? 'true' : 'false' ?>" 
+         :data-has-voiceovers="audios.length > 0" 
          data-age-group="<?= htmlspecialchars(getGradeFilterValue($poem['grade_level'])) ?>" 
          data-size="<?= htmlspecialchars($poem['size']) ?>" 
          x-show="isVisible($el)">
-      <div class="flat-card" x-data="{ expanded: false }">
+      <div class="flat-card" x-data="poemCard(<?= htmlspecialchars(json_encode($poem['audios'])) ?>)">
         <div class="poem-content">
           <h5 class="mb-1"><?= htmlspecialchars($poem['title']) ?></h5>
           <p class="text-muted mb-2"><?= htmlspecialchars($poem['authors']) ?></p>
@@ -278,36 +289,33 @@ function getPoemSizeClass($size) {
         </div>
         <div class="voiceover-panel">
           <div class="voiceover-panel-header">
-            <h6 class="mb-0 text-muted">Озвучки (<?= $poem['audio_count'] ?>)</h6>
+            <h6 class="mb-0 text-muted">Озвучки (<span x-text="audios.length"></span>)</h6>
             <button class="icon-btn add-btn"><i class="bi bi-plus-lg"></i></button>
           </div>
           
-          <?php if ($poem['audio_count'] > 0): ?>
-            <?php 
-            // Показываем озвучки этого фрагмента
-            for ($i = 0; $i < count($poem['audio_titles']); $i++):
-              $audioTitle = $poem['audio_titles'][$i] ?? 'Озвучка';
-              $isAI = isset($poem['audio_types'][$i]) && $poem['audio_types'][$i] === '1';
-            ?>
-            <div class="voiceover-item">
-              <div>
-                <strong class="d-block"><?= htmlspecialchars($audioTitle) ?></strong>
-                <div>
-                  <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
-                  <span class="badge rounded-pill <?= $isAI ? 'badge-voice-ai' : 'badge-voice-live' ?>">
-                    <?= $isAI ? 'ИИ' : 'Живой голос' ?>
-                  </span>
+          <template x-if="audios.length > 0">
+            <div>
+              <template x-for="audio in audios" :key="audio.id">
+                <div class="voiceover-item">
+                  <div>
+                    <strong class="d-block" x-text="audio.title"></strong>
+                    <div>
+                      <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
+                      <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
+                    </div>
+                  </div>
+                  <div>
+                    <button class="icon-btn"><i class="bi bi-pencil"></i></button>
+                    <button class="icon-btn" @click="deleteAudio(audio.id, $event.currentTarget)"><i class="bi bi-trash"></i></button>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <button class="icon-btn"><i class="bi bi-pencil"></i></button>
-                <button class="icon-btn"><i class="bi bi-trash"></i></button>
-              </div>
+              </template>
             </div>
-            <?php endfor; ?>
-          <?php else: ?>
+          </template>
+
+          <template x-if="audios.length === 0">
             <div class="text-muted text-center pt-3">Нет озвучек</div>
-          <?php endif; ?>
+          </template>
         </div>
       </div>
     </div>
@@ -316,6 +324,42 @@ function getPoemSizeClass($size) {
 </div>
 
 <script>
+function poemCard(initialAudios) {
+  return {
+    audios: initialAudios,
+    expanded: false,
+    deleteAudio(audioId, buttonElement) {
+      if (!audioId) {
+        console.error('Не найден ID озвучки');
+        return;
+      }
+
+      if (confirm('Вы уверены, что хотите удалить эту озвучку?')) {
+        fetch('delete_audio.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: audioId })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const index = this.audios.findIndex(a => a.id == audioId);
+            if (index > -1) {
+              this.audios.splice(index, 1);
+            }
+          } else {
+            alert('Ошибка при удалении: ' + data.error);
+          }
+        })
+        .catch(error => {
+          console.error('Ошибка сети:', error);
+          alert('Произошла ошибка сети. Пожалуйста, попробуйте еще раз.');
+        });
+      }
+    }
+  }
+}
+
 function filterData() {
   return {
     showOnlyWithoutVoiceovers: false,

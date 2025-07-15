@@ -124,6 +124,7 @@ class FragmentQuery
     {
         $this->select = array_merge($this->select, [
             'COUNT(DISTINCT at.id) AS audio_count',
+            "GROUP_CONCAT(DISTINCT at.id SEPARATOR '|') AS audio_ids",
             "GROUP_CONCAT(DISTINCT at.title SEPARATOR '|') AS audio_titles",
             "GROUP_CONCAT(DISTINCT at.is_ai_generated SEPARATOR '|') AS audio_types"
         ]);
