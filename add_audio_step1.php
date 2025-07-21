@@ -39,10 +39,7 @@ if (!isset($_FILES['audioFile']) || $_FILES['audioFile']['error'] !== UPLOAD_ERR
 }
 
 try {
-    $pdo = new PDO(DB_DSN, DB_USER, DB_PASSWORD, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
+    $pdo = getPdo();
 
     // Проверяем существование фрагмента
     $stmt = $pdo->prepare("
