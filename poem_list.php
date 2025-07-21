@@ -342,7 +342,7 @@ function getPoemSizeClass($size) {
                     </div>
                   </div>
                   <div>
-                    <button class="icon-btn" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
+                    <button class="icon-btn" @click="editAudio(audio)" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
                     <button class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></button>
                     <button class="icon-btn" title="Перейти к разметке"><i class="bi bi-play-circle"></i></button>
                     <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
@@ -373,6 +373,8 @@ function getPoemSizeClass($size) {
       <div class="modal-body">
         <form id="addAudioForm" action="add_audio_step1.php" method="POST" enctype="multipart/form-data">
           <input type="hidden" id="fragmentId" name="fragmentId">
+          <input type="hidden" id="audioId" name="audioId">
+          <input type="hidden" id="editMode" name="editMode" value="0">
           <div class="mb-3">
             <label for="audioTitle" class="form-label">Название озвучки</label>
             <input type="text" class="form-control" id="audioTitle" name="audioTitle" required>
@@ -389,8 +391,11 @@ function getPoemSizeClass($size) {
             </div>
           </div>
           <div class="mb-3">
-            <label for="audioFile" class="form-label">Аудиофайл</label>
+            <label for="audioFile" class="form-label" id="audioFileLabel">Аудиофайл</label>
             <input class="form-control" type="file" id="audioFile" name="audioFile" accept="audio/*" required>
+            <div class="form-text" id="audioFileHelp" style="display: none;">
+              Оставьте пустым, чтобы сохранить текущий файл. Загрузка нового файла сбросит обрезку и разметку.
+            </div>
           </div>
           <div class="mb-3">
             <label for="sortOrder" class="form-label">Порядок в списке озвучек</label>
@@ -431,6 +436,45 @@ function poemCard(poemData) {
     get activeAudios() {
       return this.audios.filter(audio => audio.status === 'active');
     },
+    
+    editAudio(audio) {
+      // Открываем модалку в режиме редактирования
+      const modal = new bootstrap.Modal(document.getElementById('addAudioModal'));
+      
+      // Переключаем в режим редактирования
+      const form = document.getElementById('addAudioForm');
+      const modalTitle = document.getElementById('addAudioModalLabel');
+      const submitButton = document.querySelector('#addAudioModal button[type="submit"]');
+      
+      // Обновляем заголовки и кнопки
+      modalTitle.textContent = 'Редактировать озвучку';
+      submitButton.textContent = 'Сохранить изменения';
+      
+      // Заполняем форму данными
+      document.getElementById('fragmentId').value = this.poem.id;
+      document.getElementById('audioId').value = audio.id;
+      document.getElementById('editMode').value = '1';
+      document.getElementById('audioTitle').value = audio.title;
+      
+      // Устанавливаем тип голоса
+      const voiceType = audio.is_ai ? '1' : '0';
+      document.querySelector(`input[name="voiceType"][value="${voiceType}"]`).checked = true;
+      
+      // Делаем файл опциональным
+      const audioFileInput = document.getElementById('audioFile');
+      const audioFileLabel = document.getElementById('audioFileLabel');
+      const audioFileHelp = document.getElementById('audioFileHelp');
+      
+      audioFileInput.required = false;
+      audioFileLabel.textContent = 'Новый аудиофайл (опционально)';
+      audioFileHelp.style.display = 'block';
+      
+      // Скрываем поле сортировки при редактировании
+      document.getElementById('sortOrder').closest('.mb-3').style.display = 'none';
+      
+      modal.show();
+    },
+    
     deleteAudio(audioId) {
       if (!audioId) {
         console.error('Не найден ID озвучки');
@@ -494,6 +538,32 @@ const addAudioModal = document.getElementById('addAudioModal');
 if (addAudioModal) {
     addAudioModal.addEventListener('show.bs.modal', event => {
       const button = event.relatedTarget;
+      
+      // Проверяем, если модалка уже настроена для редактирования
+      if (document.getElementById('editMode').value === '1') {
+        return; // Не сбрасываем, модалка уже настроена
+      }
+      
+      // Режим добавления - настраиваем форму
+      const modalTitle = document.getElementById('addAudioModalLabel');
+      const submitButton = document.querySelector('#addAudioModal button[type="submit"]');
+      const audioFileInput = document.getElementById('audioFile');
+      const audioFileLabel = document.getElementById('audioFileLabel');
+      const audioFileHelp = document.getElementById('audioFileHelp');
+      
+      modalTitle.textContent = 'Добавить новую озвучку';
+      submitButton.textContent = 'Далее';
+      audioFileInput.required = true;
+      audioFileLabel.textContent = 'Аудиофайл';
+      audioFileHelp.style.display = 'none';
+      
+      // Показываем поле сортировки
+      document.getElementById('sortOrder').closest('.mb-3').style.display = 'block';
+      
+      // Сбрасываем скрытые поля
+      document.getElementById('audioId').value = '';
+      document.getElementById('editMode').value = '0';
+      
       const fragmentId = button.getAttribute('data-bs-fragment-id');
       const modalInput = addAudioModal.querySelector('#fragmentId');
       modalInput.value = fragmentId;
@@ -519,6 +589,12 @@ if (addAudioModal) {
           });
         }
       }
+    });
+    
+    // Сбрасываем режим редактирования при закрытии модалки
+    addAudioModal.addEventListener('hidden.bs.modal', event => {
+      document.getElementById('editMode').value = '0';
+      document.getElementById('addAudioForm').reset();
     });
 }
 </script>
