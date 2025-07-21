@@ -207,18 +207,10 @@ function getPoemSizeClass($size) {
     .badge-voice-ai { background-color: #f3e5f5; color: #4a148c; }
     
     /* Стили для статусов озвучек */
-    .audio-status-active { background-color: #d1edff; border-left: 3px solid #0d6efd; }
-    .audio-status-draft { background-color: #f8f9fa; border-left: 3px solid #6c757d; }
-    .badge-status-active { background-color: #198754; color: white; }
-    .badge-status-draft { background-color: #6c757d; color: white; }
-    
-    .audio-section-header {
+    .audio-draft-header {
       font-size: 0.85rem;
-      font-weight: 600;
       color: #6c757d;
       margin: 12px 0 8px 0;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
   </style>
 </head>
@@ -317,51 +309,44 @@ function getPoemSizeClass($size) {
           
           <template x-if="audios.length > 0">
             <div>
-              <!-- Черновики -->
-              <template x-if="draftAudios.length > 0">
-                <div>
-                  <div class="audio-section-header">Черновики</div>
-                  <template x-for="audio in draftAudios" :key="audio.id">
-                    <div class="voiceover-item audio-status-draft">
-                      <div>
-                        <strong class="d-block" x-text="audio.title"></strong>
-                        <div>
-                          <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
-                          <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
-                          <span class="badge rounded-pill badge-status-draft">Черновик</span>
-                        </div>
-                      </div>
-                      <div>
-                        <button class="icon-btn" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
-                        <button class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></button>
-                        <button class="icon-btn" title="Перейти к разметке"><i class="bi bi-play-circle"></i></button>
-                        <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
-                      </div>
+              <!-- Активные озвучки -->
+              <template x-for="audio in activeAudios" :key="audio.id">
+                <div class="voiceover-item">
+                  <div>
+                    <strong class="d-block" x-text="audio.title"></strong>
+                    <div>
+                      <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
+                      <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
                     </div>
-                  </template>
+                  </div>
+                  <div>
+                    <button class="icon-btn" title="Редактировать"><i class="bi bi-pencil"></i></button>
+                    <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
+                  </div>
                 </div>
               </template>
               
-              <!-- Активные озвучки -->
-              <template x-if="activeAudios.length > 0">
-                <div>
-                  <div class="audio-section-header" x-show="draftAudios.length > 0">Готовые озвучки</div>
-                  <template x-for="audio in activeAudios" :key="audio.id">
-                    <div class="voiceover-item audio-status-active">
-                      <div>
-                        <strong class="d-block" x-text="audio.title"></strong>
-                        <div>
-                          <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
-                          <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
-                          <span class="badge rounded-pill badge-status-active">Готово</span>
-                        </div>
-                      </div>
-                      <div>
-                        <button class="icon-btn" title="Редактировать"><i class="bi bi-pencil"></i></button>
-                        <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
-                      </div>
+              <!-- Заголовок черновиков -->
+              <template x-if="draftAudios.length > 0">
+                <div class="audio-draft-header">Черновики</div>
+              </template>
+              
+              <!-- Черновики -->
+              <template x-for="audio in draftAudios" :key="audio.id">
+                <div class="voiceover-item">
+                  <div>
+                    <strong class="d-block" x-text="audio.title"></strong>
+                    <div>
+                      <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
+                      <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
                     </div>
-                  </template>
+                  </div>
+                  <div>
+                    <button class="icon-btn" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
+                    <button class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></button>
+                    <button class="icon-btn" title="Перейти к разметке"><i class="bi bi-play-circle"></i></button>
+                    <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
+                  </div>
                 </div>
               </template>
             </div>
