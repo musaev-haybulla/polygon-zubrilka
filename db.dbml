@@ -58,16 +58,19 @@ Table poem_authors {
 }
 
 Table audio_tracks {
-  id              bigint        [pk, increment, not null]
-  fragment_id     bigint        [not null]
-  file_path       varchar(500)  [not null]
-  duration        decimal(8,3)  [not null]
-  is_ai_generated boolean       [not null]
-  title           varchar(255)  [not null]
-  is_default      boolean       [not null]
-  created_at      datetime      [not null]
-  updated_at      datetime      [not null]
-  deleted_at      datetime
+  id                   bigint                  [pk, increment, not null]
+  fragment_id          bigint                  [not null]
+  file_path            varchar(500)            [not null]
+  original_file_path   varchar(500)
+  duration             decimal(8,3)            [not null]
+  is_ai_generated      boolean                 [not null]
+  title                varchar(255)            [not null]
+  sort_order           int                     [not null]
+  status               enum('draft', 'active') [not null, default: 'draft']
+  is_default           boolean                 [not null]
+  created_at           datetime                [not null]
+  updated_at           datetime                [not null]
+  deleted_at           datetime
 }
 
 Table audio_timings {
