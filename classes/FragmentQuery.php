@@ -127,7 +127,8 @@ class FragmentQuery
             "GROUP_CONCAT(DISTINCT at.id ORDER BY at.sort_order SEPARATOR '|') AS audio_ids",
             "GROUP_CONCAT(DISTINCT at.title ORDER BY at.sort_order SEPARATOR '|') AS audio_titles",
             "GROUP_CONCAT(DISTINCT at.is_ai_generated ORDER BY at.sort_order SEPARATOR '|') AS audio_types",
-            "GROUP_CONCAT(DISTINCT at.status ORDER BY at.sort_order SEPARATOR '|') AS audio_statuses"
+            "GROUP_CONCAT(DISTINCT at.status ORDER BY at.sort_order SEPARATOR '|') AS audio_statuses",
+            "GROUP_CONCAT(DISTINCT at.sort_order ORDER BY at.sort_order SEPARATOR '|') AS audio_sort_orders"
         ]);
         
         $this->joins[] = 'LEFT JOIN `audio_tracks` at ON f.id = at.fragment_id AND at.deleted_at IS NULL';

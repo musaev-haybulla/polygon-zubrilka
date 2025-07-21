@@ -48,6 +48,7 @@ try {
         $audioTitles = $row['audio_titles'] ? explode('|', $row['audio_titles']) : [];
         $audioTypes = $row['audio_types'] ? explode('|', $row['audio_types']) : [];
         $audioStatuses = $row['audio_statuses'] ? explode('|', $row['audio_statuses']) : [];
+        $audioSortOrders = $row['audio_sort_orders'] ? explode('|', $row['audio_sort_orders']) : [];
         
         $audios = [];
         for ($i = 0; $i < $audioCount; $i++) {
@@ -55,7 +56,8 @@ try {
                 'id' => $audioIds[$i] ?? null,
                 'title' => $audioTitles[$i] ?? 'Озвучка',
                 'is_ai' => isset($audioTypes[$i]) && $audioTypes[$i] === '1',
-                'status' => $audioStatuses[$i] ?? 'draft'
+                'status' => $audioStatuses[$i] ?? 'draft',
+                'sort_order' => (int)($audioSortOrders[$i] ?? $i + 1)
             ];
         }
         
@@ -362,7 +364,7 @@ function getPoemSizeClass($size) {
 
 <!-- Модальное окно для добавления озвучки -->
 <div class="modal fade" id="addAudioModal" tabindex="-1" aria-labelledby="addAudioModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="addAudioModalLabel">Добавить новую озвучку</h5>
@@ -405,7 +407,7 @@ function getPoemSizeClass($size) {
               Выберите, где в списке озвучек должна располагаться новая запись.
             </div>
           </div>
-          <div class="mb-3 form-check bg-light p-3 rounded">
+          <div class="mb-3 form-check p-3 rounded">
             <input type="checkbox" class="form-check-input" id="trimAudio" name="trimAudio" value="1">
             <label class="form-check-label" for="trimAudio"><strong>Обрезать аудиофайл?</strong></label>
             <small class="form-text text-muted d-block">Позволит на следующем шаге удалить тишину или лишние фрагменты в начале и конце озвучки.</small>
@@ -414,7 +416,14 @@ function getPoemSizeClass($size) {
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-        <button type="submit" form="addAudioForm" class="btn btn-primary">Далее</button>
+        <div id="addModeButtons">
+          <button type="submit" form="addAudioForm" class="btn btn-primary">Далее</button>
+        </div>
+        <div id="editModeButtons" style="display: none;">
+          <button type="submit" form="addAudioForm" class="btn btn-success" data-action="save">Сохранить</button>
+          <button type="submit" form="addAudioForm" class="btn btn-warning" data-action="save-and-trim">Сохранить и обрезать</button>
+          <button type="submit" form="addAudioForm" class="btn btn-info" data-action="save-and-markup">Сохранить и разметить</button>
+        </div>
       </div>
     </div>
   </div>
@@ -444,9 +453,10 @@ function poemCard(poemData) {
       const modalTitle = document.getElementById('addAudioModalLabel');
       const submitButton = document.querySelector('#addAudioModal button[type="submit"]');
       
-      // Обновляем заголовки и кнопки
+      // Обновляем заголовки и переключаем кнопки
       modalTitle.textContent = 'Редактировать озвучку';
-      submitButton.textContent = 'Сохранить изменения';
+      document.getElementById('addModeButtons').style.display = 'none';
+      document.getElementById('editModeButtons').style.display = 'block';
       
       // Заполняем форму данными
       document.getElementById('fragmentId').value = this.poem.id;
@@ -465,14 +475,16 @@ function poemCard(poemData) {
         isAi: audio.is_ai
       });
       
-      // Делаем файл опциональным
+      // Делаем файл опциональным и скрываем чекбокс обрезки
       const audioFileInput = document.getElementById('audioFile');
       const audioFileLabel = document.getElementById('audioFileLabel');
       const audioFileHelp = document.getElementById('audioFileHelp');
+      const trimAudioContainer = document.getElementById('trimAudio').closest('.mb-3');
       
       audioFileInput.required = false;
       audioFileLabel.textContent = 'Новый аудиофайл (опционально)';
       audioFileHelp.style.display = 'block';
+      trimAudioContainer.style.display = 'none';
       
       // Показываем поле сортировки и заполняем его текущими озвучками
       const sortOrderContainer = document.getElementById('sortOrder').closest('.mb-3');
@@ -484,18 +496,33 @@ function poemCard(poemData) {
         sortOrderSelect.removeChild(sortOrderSelect.lastChild);
       }
       
-      // Найдем все озвучки этого фрагмента
-      this.audios.forEach((audioItem, index) => {
-        if (audioItem.id != audio.id) { // Исключаем текущую озвучку
+      // Добавляем опции для других озвучек
+      this.audios
+        .filter(audioItem => audioItem.id != audio.id) // Исключаем текущую озвучку
+        .sort((a, b) => a.sort_order - b.sort_order) // Сортируем по sort_order
+        .forEach((audioItem) => {
           const option = document.createElement('option');
-          option.value = index + 2; // +2 потому что 1 занят "Добавить первым"
-          option.textContent = `После "${audioItem.title}"`;
+          option.value = audioItem.sort_order + 1;
+          // Если это позиция, где сейчас стоит редактируемая озвучка
+          const isCurrent = audioItem.sort_order + 1 === audio.sort_order;
+          option.textContent = `После "${audioItem.title}"${isCurrent ? ' (текущая позиция)' : ''}`;
           sortOrderSelect.appendChild(option);
-        }
-      });
+        });
       
-      // Устанавливаем текущую позицию (добавить первым по умолчанию)
-      sortOrderSelect.value = '1';
+      // Обновляем текст первой опции если это текущая позиция
+      if (audio.sort_order === 1) {
+        sortOrderSelect.options[0].textContent = 'Добавить первым (текущая позиция)';
+        sortOrderSelect.value = '1';
+      } else {
+        sortOrderSelect.options[0].textContent = 'Добавить первым';
+        // Ищем озвучку, после которой стоит текущая
+        const prevAudio = this.audios.find(a => a.sort_order === audio.sort_order - 1);
+        if (prevAudio) {
+          sortOrderSelect.value = audio.sort_order; // Это будет соответствовать опции "После prevAudio"
+        } else {
+          sortOrderSelect.value = '1'; // Fallback
+        }
+      }
       
       modal.show();
     },
@@ -577,10 +604,15 @@ if (addAudioModal) {
       const audioFileHelp = document.getElementById('audioFileHelp');
       
       modalTitle.textContent = 'Добавить новую озвучку';
-      submitButton.textContent = 'Далее';
+      document.getElementById('addModeButtons').style.display = 'block';
+      document.getElementById('editModeButtons').style.display = 'none';
       audioFileInput.required = true;
       audioFileLabel.textContent = 'Аудиофайл';
       audioFileHelp.style.display = 'none';
+      
+      // Показываем чекбокс обрезки для режима добавления
+      const trimAudioContainer = document.getElementById('trimAudio').closest('.mb-3');
+      trimAudioContainer.style.display = 'block';
       
       // Показываем поле сортировки
       document.getElementById('sortOrder').closest('.mb-3').style.display = 'block';
@@ -608,7 +640,7 @@ if (addAudioModal) {
         if (poemData.audios && poemData.audios.length > 0) {
           poemData.audios.forEach((audio, index) => {
             const option = document.createElement('option');
-            option.value = index + 2; // +2 потому что 1 занят "Добавить первым"
+            option.value = audio.sort_order + 1; // Используем реальный sort_order + 1
             option.textContent = `После "${audio.title}"`;
             sortOrderSelect.appendChild(option);
           });
@@ -622,14 +654,57 @@ if (addAudioModal) {
       document.getElementById('addAudioForm').reset();
     });
     
-    // Обработчик отправки формы для обновления интерфейса
-    document.getElementById('addAudioForm').addEventListener('submit', function(e) {
-      const editMode = document.getElementById('editMode').value === '1';
-      if (editMode) {
-        console.log('Submitting edit form with data:', {
-          audioId: document.getElementById('audioId').value,
-          audioTitle: document.getElementById('audioTitle').value,
-          voiceType: document.querySelector('input[name="voiceType"]:checked').value
+    // Обработчики для кнопок редактирования
+    document.getElementById('editModeButtons').addEventListener('click', function(e) {
+      if (e.target.type === 'submit') {
+        e.preventDefault();
+        const action = e.target.dataset.action;
+        const form = document.getElementById('addAudioForm');
+        const formData = new FormData(form);
+        const audioId = formData.get('audioId');
+        
+        // Устанавливаем нужное действие
+        formData.set('editAction', action);
+        
+        fetch('add_audio_step1.php', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => {
+          if (response.ok) {
+            if (action === 'save') {
+              // Обычное сохранение - обновляем интерфейс
+              const cards = document.querySelectorAll('[x-data]');
+              cards.forEach(card => {
+                if (card._x_dataStack) {
+                  const poemData = card._x_dataStack[0];
+                  if (poemData && poemData.audios) {
+                    const audioIndex = poemData.audios.findIndex(a => a.id == audioId);
+                    if (audioIndex !== -1) {
+                      poemData.audios[audioIndex].title = formData.get('audioTitle');
+                      poemData.audios[audioIndex].is_ai = formData.get('voiceType') === '1';
+                      poemData.audios[audioIndex].sort_order = parseInt(formData.get('sortOrder'));
+                      poemData.audios.sort((a, b) => a.sort_order - b.sort_order);
+                    }
+                  }
+                }
+              });
+              const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
+              modal.hide();
+            } else if (action === 'save-and-trim') {
+              // Переход на страницу обрезки
+              window.location.href = `add_audio_step2.php?id=${audioId}`;
+            } else if (action === 'save-and-markup') {
+              // Переход на страницу разметки
+              window.location.href = `add_audio_step3.php?id=${audioId}`;
+            }
+          } else {
+            alert('Ошибка при сохранении изменений');
+          }
+        })
+        .catch(error => {
+          console.error('Network error:', error);
+          alert('Произошла ошибка сети');
         });
       }
     });

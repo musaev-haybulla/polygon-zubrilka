@@ -97,40 +97,18 @@ try {
         $stmt->execute(['audio_id' => $audioId]);
         $currentSortOrder = (int)$stmt->fetchColumn();
         
-        // Если изменился порядок сортировки, обновляем сортировку других озвучек
+        // Если изменился порядок сортировки, используем AudioSorter для правильной перестановки
         if ($currentSortOrder !== $sortOrder) {
-            if ($sortOrder === 1) {
-                // Перемещаем в начало - сдвигаем все остальные вниз
-                $stmt = $pdo->prepare("
-                    UPDATE audio_tracks 
-                    SET sort_order = sort_order + 1 
-                    WHERE fragment_id = :fragment_id 
-                    AND id != :audio_id 
-                    AND deleted_at IS NULL
-                ");
-                $stmt->execute(['fragment_id' => $fragmentId, 'audio_id' => $audioId]);
-            } else {
-                // Вставляем в определенную позицию
-                $stmt = $pdo->prepare("
-                    UPDATE audio_tracks 
-                    SET sort_order = sort_order + 1 
-                    WHERE fragment_id = :fragment_id 
-                    AND sort_order >= :sort_order 
-                    AND id != :audio_id 
-                    AND deleted_at IS NULL
-                ");
-                $stmt->execute([
-                    'fragment_id' => $fragmentId,
-                    'sort_order' => $sortOrder,
-                    'audio_id' => $audioId
-                ]);
+            $audioSorter = new AudioSorter();
+            if (!$audioSorter->moveAudio($audioId, $fragmentId, $sortOrder)) {
+                throw new Exception('Не удалось переставить озвучку');
             }
         }
         
+        // Обновляем только метаданные, sort_order уже обработан AudioSorter
         $updateFields = [
             'title' => $audioTitle,
             'is_ai_generated' => $voiceType,
-            'sort_order' => $sortOrder,
             'updated_at' => date('Y-m-d H:i:s')
         ];
         
@@ -139,7 +117,6 @@ try {
             'audio_id' => $audioId,
             'title' => $audioTitle,
             'is_ai_generated' => $voiceType,
-            'sort_order' => $sortOrder,
             'updated_at' => date('Y-m-d H:i:s')
         ];
 
@@ -206,30 +183,9 @@ try {
         error_log("DEBUG - Affected rows: " . $stmt->rowCount());
 
     } else {
-        // РЕЖИМ ДОБАВЛЕНИЯ (существующая логика)
-        // Сдвигаем существующие озвучки, если нужно
-        if ($sortOrder > 1) {
-            $stmt = $pdo->prepare("
-                UPDATE audio_tracks 
-                SET sort_order = sort_order + 1 
-                WHERE fragment_id = :fragment_id 
-                AND sort_order >= :sort_order 
-                AND deleted_at IS NULL
-            ");
-            $stmt->execute([
-                'fragment_id' => $fragmentId,
-                'sort_order' => $sortOrder
-            ]);
-        } else {
-            // Если добавляем первым, сдвигаем все существующие
-            $stmt = $pdo->prepare("
-                UPDATE audio_tracks 
-                SET sort_order = sort_order + 1 
-                WHERE fragment_id = :fragment_id 
-                AND deleted_at IS NULL
-            ");
-            $stmt->execute(['fragment_id' => $fragmentId]);
-        }
+        // РЕЖИМ ДОБАВЛЕНИЯ - используем AudioSorter для правильной вставки
+        $audioSorter = new AudioSorter();
+        $sortOrder = $audioSorter->getInsertPosition($fragmentId, $sortOrder);
 
         // Сохраняем аудиофайл
         $uploadDir = __DIR__ . '/uploads/audio/';
