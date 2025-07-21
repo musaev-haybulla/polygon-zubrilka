@@ -315,7 +315,6 @@ function getPoemSizeClass($size) {
                   <div>
                     <strong class="d-block" x-text="audio.title"></strong>
                     <div>
-                      <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
                       <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
                     </div>
                   </div>
@@ -337,7 +336,6 @@ function getPoemSizeClass($size) {
                   <div>
                     <strong class="d-block" x-text="audio.title"></strong>
                     <div>
-                      <span class="badge rounded-pill me-1 badge-gender-male">Муж.</span>
                       <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
                     </div>
                   </div>
@@ -460,6 +458,13 @@ function poemCard(poemData) {
       const voiceType = audio.is_ai ? '1' : '0';
       document.querySelector(`input[name="voiceType"][value="${voiceType}"]`).checked = true;
       
+      console.log('Edit audio:', {
+        audioId: audio.id,
+        title: audio.title,
+        voiceType: voiceType,
+        isAi: audio.is_ai
+      });
+      
       // Делаем файл опциональным
       const audioFileInput = document.getElementById('audioFile');
       const audioFileLabel = document.getElementById('audioFileLabel');
@@ -469,8 +474,28 @@ function poemCard(poemData) {
       audioFileLabel.textContent = 'Новый аудиофайл (опционально)';
       audioFileHelp.style.display = 'block';
       
-      // Скрываем поле сортировки при редактировании
-      document.getElementById('sortOrder').closest('.mb-3').style.display = 'none';
+      // Показываем поле сортировки и заполняем его текущими озвучками
+      const sortOrderContainer = document.getElementById('sortOrder').closest('.mb-3');
+      sortOrderContainer.style.display = 'block';
+      
+      // Заполняем опции сортировки для редактирования
+      const sortOrderSelect = document.getElementById('sortOrder');
+      while (sortOrderSelect.children.length > 1) {
+        sortOrderSelect.removeChild(sortOrderSelect.lastChild);
+      }
+      
+      // Найдем все озвучки этого фрагмента
+      this.audios.forEach((audioItem, index) => {
+        if (audioItem.id != audio.id) { // Исключаем текущую озвучку
+          const option = document.createElement('option');
+          option.value = index + 2; // +2 потому что 1 занят "Добавить первым"
+          option.textContent = `После "${audioItem.title}"`;
+          sortOrderSelect.appendChild(option);
+        }
+      });
+      
+      // Устанавливаем текущую позицию (добавить первым по умолчанию)
+      sortOrderSelect.value = '1';
       
       modal.show();
     },
@@ -595,6 +620,18 @@ if (addAudioModal) {
     addAudioModal.addEventListener('hidden.bs.modal', event => {
       document.getElementById('editMode').value = '0';
       document.getElementById('addAudioForm').reset();
+    });
+    
+    // Обработчик отправки формы для обновления интерфейса
+    document.getElementById('addAudioForm').addEventListener('submit', function(e) {
+      const editMode = document.getElementById('editMode').value === '1';
+      if (editMode) {
+        console.log('Submitting edit form with data:', {
+          audioId: document.getElementById('audioId').value,
+          audioTitle: document.getElementById('audioTitle').value,
+          voiceType: document.querySelector('input[name="voiceType"]:checked').value
+        });
+      }
     });
 }
 </script>

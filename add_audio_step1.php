@@ -28,8 +28,15 @@ $audioId = $editMode ? (int)($_POST['audioId'] ?? 0) : 0;
 $fragmentId = (int)($_POST['fragmentId'] ?? 0);
 $audioTitle = trim($_POST['audioTitle'] ?? '');
 $voiceType = (int)($_POST['voiceType'] ?? 0);
-$sortOrder = $editMode ? 0 : (int)($_POST['sortOrder'] ?? 1); // Сортировка не нужна при редактировании
+$sortOrder = (int)($_POST['sortOrder'] ?? 1); // Сортировка доступна в обоих режимах
 $trimAudio = !empty($_POST['trimAudio']);
+
+// Отладочное логирование
+error_log("DEBUG - Edit mode: " . ($editMode ? 'YES' : 'NO'));
+error_log("DEBUG - Audio ID: " . $audioId);
+error_log("DEBUG - Title: " . $audioTitle);
+error_log("DEBUG - Voice type: " . $voiceType);
+error_log("DEBUG - POST data: " . print_r($_POST, true));
 
 if ($fragmentId <= 0 || empty($audioTitle)) {
     header('Location: poem_list.php?error=invalid_data');
@@ -84,15 +91,56 @@ try {
 
     if ($editMode) {
         // РЕЖИМ РЕДАКТИРОВАНИЯ
+        
+        // Получаем текущий sort_order редактируемой озвучки
+        $stmt = $pdo->prepare("SELECT sort_order FROM audio_tracks WHERE id = :audio_id");
+        $stmt->execute(['audio_id' => $audioId]);
+        $currentSortOrder = (int)$stmt->fetchColumn();
+        
+        // Если изменился порядок сортировки, обновляем сортировку других озвучек
+        if ($currentSortOrder !== $sortOrder) {
+            if ($sortOrder === 1) {
+                // Перемещаем в начало - сдвигаем все остальные вниз
+                $stmt = $pdo->prepare("
+                    UPDATE audio_tracks 
+                    SET sort_order = sort_order + 1 
+                    WHERE fragment_id = :fragment_id 
+                    AND id != :audio_id 
+                    AND deleted_at IS NULL
+                ");
+                $stmt->execute(['fragment_id' => $fragmentId, 'audio_id' => $audioId]);
+            } else {
+                // Вставляем в определенную позицию
+                $stmt = $pdo->prepare("
+                    UPDATE audio_tracks 
+                    SET sort_order = sort_order + 1 
+                    WHERE fragment_id = :fragment_id 
+                    AND sort_order >= :sort_order 
+                    AND id != :audio_id 
+                    AND deleted_at IS NULL
+                ");
+                $stmt->execute([
+                    'fragment_id' => $fragmentId,
+                    'sort_order' => $sortOrder,
+                    'audio_id' => $audioId
+                ]);
+            }
+        }
+        
         $updateFields = [
             'title' => $audioTitle,
             'is_ai_generated' => $voiceType,
+            'sort_order' => $sortOrder,
             'updated_at' => date('Y-m-d H:i:s')
         ];
+        
+        // Параметры должны содержать все поля + audio_id
         $params = [
             'audio_id' => $audioId,
             'title' => $audioTitle,
-            'is_ai_generated' => $voiceType
+            'is_ai_generated' => $voiceType,
+            'sort_order' => $sortOrder,
+            'updated_at' => date('Y-m-d H:i:s')
         ];
 
         // Если загружен новый файл, обрабатываем его
@@ -141,14 +189,21 @@ try {
             
             $params['file_path'] = 'uploads/audio/' . $fileName;
             $params['duration'] = $duration;
+            $params['original_file_path'] = null;
         }
 
         // Обновляем запись
         $setClause = implode(', ', array_map(fn($field) => "$field = :$field", array_keys($updateFields)));
         $sql = "UPDATE audio_tracks SET $setClause WHERE id = :audio_id";
         
+        error_log("DEBUG - SQL: " . $sql);
+        error_log("DEBUG - Params: " . print_r($params, true));
+        
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $result = $stmt->execute($params);
+        
+        error_log("DEBUG - Update result: " . ($result ? 'SUCCESS' : 'FAILED'));
+        error_log("DEBUG - Affected rows: " . $stmt->rowCount());
 
     } else {
         // РЕЖИМ ДОБАВЛЕНИЯ (существующая логика)
