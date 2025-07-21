@@ -5,3 +5,6 @@ poem_import.log
 .DS_Store
 
 tmp/
+
+# Папка для загруженных файлов
+/uploads/

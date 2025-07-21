@@ -124,9 +124,10 @@ class FragmentQuery
     {
         $this->select = array_merge($this->select, [
             'COUNT(DISTINCT at.id) AS audio_count',
-            "GROUP_CONCAT(DISTINCT at.id SEPARATOR '|') AS audio_ids",
-            "GROUP_CONCAT(DISTINCT at.title SEPARATOR '|') AS audio_titles",
-            "GROUP_CONCAT(DISTINCT at.is_ai_generated SEPARATOR '|') AS audio_types"
+            "GROUP_CONCAT(DISTINCT at.id ORDER BY at.sort_order SEPARATOR '|') AS audio_ids",
+            "GROUP_CONCAT(DISTINCT at.title ORDER BY at.sort_order SEPARATOR '|') AS audio_titles",
+            "GROUP_CONCAT(DISTINCT at.is_ai_generated ORDER BY at.sort_order SEPARATOR '|') AS audio_types",
+            "GROUP_CONCAT(DISTINCT at.status ORDER BY at.sort_order SEPARATOR '|') AS audio_statuses"
         ]);
         
         $this->joins[] = 'LEFT JOIN `audio_tracks` at ON f.id = at.fragment_id AND at.deleted_at IS NULL';
