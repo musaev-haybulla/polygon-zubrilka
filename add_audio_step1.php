@@ -1,6 +1,6 @@
 <?php
 /**
- * Шаг 1: Загрузка аудиофайла с выбором порядка сортировки
+ * Обработчик добавления озвучки с выбором порядка сортировки
  */
 declare(strict_types=1);
 
@@ -24,9 +24,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $fragmentId = (int)($_POST['fragmentId'] ?? 0);
 $audioTitle = trim($_POST['audioTitle'] ?? '');
 $voiceType = (int)($_POST['voiceType'] ?? 0);
+$sortOrder = (int)($_POST['sortOrder'] ?? 1);
 $trimAudio = !empty($_POST['trimAudio']);
 
-if ($fragmentId <= 0 || empty($audioTitle)) {
+if ($fragmentId <= 0 || empty($audioTitle) || $sortOrder <= 0) {
     header('Location: poem_list.php?error=invalid_data');
     exit;
 }
@@ -43,135 +44,109 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 
-    // Получаем информацию о фрагменте
+    // Проверяем существование фрагмента
     $stmt = $pdo->prepare("
-        SELECT f.id, f.label, p.title as poem_title 
-        FROM fragments f 
-        JOIN poems p ON f.poem_id = p.id 
-        WHERE f.id = :fragment_id AND f.deleted_at IS NULL
+        SELECT id FROM fragments 
+        WHERE id = :fragment_id AND deleted_at IS NULL
     ");
     $stmt->execute(['fragment_id' => $fragmentId]);
-    $fragment = $stmt->fetch();
-    
-    if (!$fragment) {
+    if (!$stmt->fetch()) {
         header('Location: poem_list.php?error=fragment_not_found');
         exit;
     }
 
-    // Получаем существующие озвучки для выпадающего списка порядка
-    $stmt = $pdo->prepare("
-        SELECT id, title, sort_order 
-        FROM audio_tracks 
-        WHERE fragment_id = :fragment_id AND deleted_at IS NULL 
-        ORDER BY sort_order ASC
-    ");
-    $stmt->execute(['fragment_id' => $fragmentId]);
-    $existingAudios = $stmt->fetchAll();
+    // Начинаем транзакцию
+    $pdo->beginTransaction();
 
-    // Определяем заголовок фрагмента
-    $fragmentTitle = $fragment['label'] ?: $fragment['poem_title'];
-    if ($fragment['label'] && $fragment['poem_title']) {
-        $fragmentTitle = $fragment['poem_title'] . ' - ' . $fragment['label'];
+    // Сдвигаем существующие озвучки, если нужно
+    if ($sortOrder > 1) {
+        $stmt = $pdo->prepare("
+            UPDATE audio_tracks 
+            SET sort_order = sort_order + 1 
+            WHERE fragment_id = :fragment_id 
+            AND sort_order >= :sort_order 
+            AND deleted_at IS NULL
+        ");
+        $stmt->execute([
+            'fragment_id' => $fragmentId,
+            'sort_order' => $sortOrder
+        ]);
+    } else {
+        // Если добавляем первым, сдвигаем все существующие
+        $stmt = $pdo->prepare("
+            UPDATE audio_tracks 
+            SET sort_order = sort_order + 1 
+            WHERE fragment_id = :fragment_id 
+            AND deleted_at IS NULL
+        ");
+        $stmt->execute(['fragment_id' => $fragmentId]);
     }
 
-} catch (PDOException $e) {
-    error_log("Database error in add_audio_step1.php: " . $e->getMessage());
-    header('Location: poem_list.php?error=database');
+    // Сохраняем аудиофайл
+    $uploadDir = __DIR__ . '/uploads/audio/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $fileExtension = pathinfo($_FILES['audioFile']['name'], PATHINFO_EXTENSION);
+    $fileName = uniqid('audio_') . '.' . $fileExtension;
+    $filePath = $uploadDir . $fileName;
+    
+    if (!move_uploaded_file($_FILES['audioFile']['tmp_name'], $filePath)) {
+        throw new Exception('Не удалось сохранить аудиофайл');
+    }
+
+    // Получаем длительность файла (базовый способ)
+    $duration = 0;
+    if (function_exists('shell_exec') && $fileExtension === 'mp3') {
+        $output = shell_exec("ffprobe -i '$filePath' -show_entries format=duration -v quiet -of csv=\"p=0\"");
+        if ($output !== null) {
+            $duration = floatval(trim($output));
+        }
+    }
+
+    // Вставляем запись в базу данных
+    $stmt = $pdo->prepare("
+        INSERT INTO audio_tracks 
+        (fragment_id, file_path, duration, is_ai_generated, title, sort_order, status, is_default, created_at, updated_at) 
+        VALUES 
+        (:fragment_id, :file_path, :duration, :is_ai_generated, :title, :sort_order, :status, :is_default, NOW(), NOW())
+    ");
+    
+    $stmt->execute([
+        'fragment_id' => $fragmentId,
+        'file_path' => 'uploads/audio/' . $fileName,
+        'duration' => $duration,
+        'is_ai_generated' => $voiceType,
+        'title' => $audioTitle,
+        'sort_order' => $sortOrder,
+        'status' => $trimAudio ? 'draft' : 'active',
+        'is_default' => 0
+    ]);
+
+    // Подтверждаем транзакцию
+    $pdo->commit();
+
+    // Если нужна обрезка, перенаправляем на следующий шаг
+    if ($trimAudio) {
+        $audioId = $pdo->lastInsertId();
+        header("Location: add_audio_step2.php?id=$audioId");
+    } else {
+        header('Location: poem_list.php?success=audio_added');
+    }
+    exit;
+
+} catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    
+    // Удаляем файл если он был загружен
+    if (isset($filePath) && file_exists($filePath)) {
+        unlink($filePath);
+    }
+    
+    error_log("Error in add_audio_step1.php: " . $e->getMessage());
+    header('Location: poem_list.php?error=processing_failed');
     exit;
 }
-?>
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Добавить озвучку - Шаг 2</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-4">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Добавить новую озвучку - Шаг 2</h5>
-                        <small class="text-muted">Выберите порядок сортировки для: <?= htmlspecialchars($fragmentTitle) ?></small>
-                    </div>
-                    <div class="card-body">
-                        <form action="add_audio_step2.php" method="POST" enctype="multipart/form-data">
-                            <!-- Скрытые поля с данными из предыдущего шага -->
-                            <input type="hidden" name="fragmentId" value="<?= $fragmentId ?>">
-                            <input type="hidden" name="audioTitle" value="<?= htmlspecialchars($audioTitle) ?>">
-                            <input type="hidden" name="voiceType" value="<?= $voiceType ?>">
-                            <input type="hidden" name="trimAudio" value="<?= $trimAudio ? '1' : '0' ?>">
-                            
-                            <!-- Передаем загруженный файл -->
-                            <?php
-                            // Временно сохраняем файл
-                            $uploadDir = __DIR__ . '/uploads/temp/';
-                            if (!is_dir($uploadDir)) {
-                                mkdir($uploadDir, 0755, true);
-                            }
-                            
-                            $tempFileName = uniqid('audio_temp_') . '.' . pathinfo($_FILES['audioFile']['name'], PATHINFO_EXTENSION);
-                            $tempFilePath = $uploadDir . $tempFileName;
-                            
-                            if (!move_uploaded_file($_FILES['audioFile']['tmp_name'], $tempFilePath)) {
-                                throw new Exception('Не удалось сохранить временный файл');
-                            }
-                            ?>
-                            <input type="hidden" name="tempFileName" value="<?= htmlspecialchars($tempFileName) ?>">
-                            <input type="hidden" name="originalFileName" value="<?= htmlspecialchars($_FILES['audioFile']['name']) ?>">
-
-                            <div class="mb-4">
-                                <h6>Информация об озвучке:</h6>
-                                <ul class="list-unstyled">
-                                    <li><strong>Название:</strong> <?= htmlspecialchars($audioTitle) ?></li>
-                                    <li><strong>Тип голоса:</strong> <?= $voiceType ? 'ИИ-генерированный' : 'Живой голос' ?></li>
-                                    <li><strong>Файл:</strong> <?= htmlspecialchars($_FILES['audioFile']['name']) ?></li>
-                                    <li><strong>Обрезка:</strong> <?= $trimAudio ? 'Да' : 'Нет' ?></li>
-                                </ul>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="sortOrder" class="form-label">Порядок в списке озвучек</label>
-                                <select name="sortOrder" id="sortOrder" class="form-select" required>
-                                    <option value="1">Добавить первым</option>
-                                    <?php foreach ($existingAudios as $audio): ?>
-                                        <option value="<?= $audio['sort_order'] + 1 ?>">
-                                            После "<?= htmlspecialchars($audio['title']) ?>"
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <div class="form-text">
-                                    Выберите, где в списке озвучек должна располагаться новая запись.
-                                </div>
-                            </div>
-
-                            <?php if (!empty($existingAudios)): ?>
-                            <div class="mb-3">
-                                <h6>Текущие озвучки:</h6>
-                                <ol class="list-group list-group-numbered">
-                                    <?php foreach ($existingAudios as $audio): ?>
-                                        <li class="list-group-item"><?= htmlspecialchars($audio['title']) ?></li>
-                                    <?php endforeach; ?>
-                                </ol>
-                            </div>
-                            <?php endif; ?>
-
-                            <div class="d-flex gap-2">
-                                <a href="poem_list.php" class="btn btn-secondary">Отмена</a>
-                                <button type="submit" class="btn btn-primary">
-                                    <?= $trimAudio ? 'Далее к обрезке' : 'Сохранить озвучку' ?>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>

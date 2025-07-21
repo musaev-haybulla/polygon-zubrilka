@@ -358,6 +358,16 @@ function getPoemSizeClass($size) {
             <label for="audioFile" class="form-label">Аудиофайл</label>
             <input class="form-control" type="file" id="audioFile" name="audioFile" accept="audio/*" required>
           </div>
+          <div class="mb-3">
+            <label for="sortOrder" class="form-label">Порядок в списке озвучек</label>
+            <select name="sortOrder" id="sortOrder" class="form-select" required>
+              <option value="1">Добавить первым</option>
+              <!-- Опции будут добавлены динамически через JavaScript -->
+            </select>
+            <div class="form-text">
+              Выберите, где в списке озвучек должна располагаться новая запись.
+            </div>
+          </div>
           <div class="mb-3 form-check bg-light p-3 rounded">
             <input type="checkbox" class="form-check-input" id="trimAudio" name="trimAudio" value="1">
             <label class="form-check-label" for="trimAudio"><strong>Обрезать аудиофайл?</strong></label>
@@ -445,6 +455,28 @@ if (addAudioModal) {
       const fragmentId = button.getAttribute('data-bs-fragment-id');
       const modalInput = addAudioModal.querySelector('#fragmentId');
       modalInput.value = fragmentId;
+      
+      // Находим данные стихотворения по fragmentId
+      const poemCard = button.closest('[x-data]');
+      if (poemCard && poemCard._x_dataStack) {
+        const poemData = poemCard._x_dataStack[0];
+        const sortOrderSelect = addAudioModal.querySelector('#sortOrder');
+        
+        // Очищаем существующие опции (кроме "Добавить первым")
+        while (sortOrderSelect.children.length > 1) {
+          sortOrderSelect.removeChild(sortOrderSelect.lastChild);
+        }
+        
+        // Добавляем опции для каждой существующей озвучки
+        if (poemData.audios && poemData.audios.length > 0) {
+          poemData.audios.forEach((audio, index) => {
+            const option = document.createElement('option');
+            option.value = index + 2; // +2 потому что 1 занят "Добавить первым"
+            option.textContent = `После "${audio.title}"`;
+            sortOrderSelect.appendChild(option);
+          });
+        }
+      }
     });
 }
 </script>
