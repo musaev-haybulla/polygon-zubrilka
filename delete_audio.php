@@ -5,6 +5,7 @@ header('Content-Type: application/json');
 
 require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
+require __DIR__ . '/classes/AudioFileHelper.php';
 
 // Получаем данные из запроса
 $input = json_decode(file_get_contents('php://input'), true);
@@ -20,14 +21,14 @@ $pdo = getPdo();
 try {
     $pdo->beginTransaction();
 
-    // 1. Находим путь к файлу
-    $stmt = $pdo->prepare("SELECT file_path FROM audio_tracks WHERE id = :id");
+    // 1. Находим данные о файле
+    $stmt = $pdo->prepare("SELECT filename, fragment_id FROM audio_tracks WHERE id = :id");
     $stmt->execute([':id' => $audioId]);
-    $filePath = $stmt->fetchColumn();
+    $audioData = $stmt->fetch();
 
-    if ($filePath) {
+    if ($audioData && $audioData['filename']) {
         // 2. Удаляем файл с диска
-        $fullPath = __DIR__ . '/' . $filePath;
+        $fullPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['filename']);
         if (file_exists($fullPath)) {
             unlink($fullPath);
         }

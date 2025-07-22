@@ -7,6 +7,7 @@ declare(strict_types=1);
 // Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
+require __DIR__ . '/classes/AudioFileHelper.php';
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
@@ -23,6 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Определяем режим работы
 $editMode = !empty($_POST['editMode']) && $_POST['editMode'] === '1';
 $audioId = $editMode ? (int)($_POST['audioId'] ?? 0) : 0;
+
+// Определяем подтверждение пользователя для перезаписи обработанных файлов
+$confirmed = !empty($_POST['confirmed']) && $_POST['confirmed'] === '1';
 
 // Валидация данных
 $fragmentId = (int)($_POST['fragmentId'] ?? 0);
@@ -73,7 +77,7 @@ try {
     // Если режим редактирования, проверяем существование аудиозаписи
     if ($editMode) {
         $stmt = $pdo->prepare("
-            SELECT id, file_path, original_file_path 
+            SELECT id, filename 
             FROM audio_tracks 
             WHERE id = :audio_id AND fragment_id = :fragment_id AND deleted_at IS NULL
         ");
@@ -122,15 +126,78 @@ try {
 
         // Если загружен новый файл, обрабатываем его
         if ($hasNewFile) {
-            // Сохраняем новый аудиофайл
-            $uploadDir = __DIR__ . '/uploads/audio/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+            // Проверяем есть ли обработка (обрезка или разметка) и нет ли подтверждения
+            if (!$confirmed) {
+                $stmt = $pdo->prepare("
+                    SELECT filename, original_filename,
+                           (SELECT COUNT(*) FROM audio_timings WHERE audio_track_id = :audio_id) as timings_count
+                    FROM audio_tracks 
+                    WHERE id = :audio_id
+                ");
+                $stmt->execute(['audio_id' => $audioId]);
+                $currentAudio = $stmt->fetch();
+                
+                $hasProcessing = false;
+                $processingTypes = [];
+                
+                // Проверяем была ли обрезка
+                if ($currentAudio && $currentAudio['original_filename'] && 
+                    $currentAudio['original_filename'] !== $currentAudio['filename']) {
+                    $hasProcessing = true;
+                    $processingTypes[] = 'обрезка';
+                }
+                
+                // Проверяем была ли разметка
+                if ($currentAudio && $currentAudio['timings_count'] > 0) {
+                    $hasProcessing = true;
+                    $processingTypes[] = 'разметка';
+                }
+                
+                if ($hasProcessing) {
+                    $processingText = implode(' и ', $processingTypes);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode([
+                        'warning' => "Загрузка нового файла удалит текущую {$processingText}. Продолжить?"
+                    ]);
+                    exit;
+                }
             }
-
-            $fileExtension = pathinfo($_FILES['audioFile']['name'], PATHINFO_EXTENSION);
-            $fileName = uniqid('audio_') . '.' . $fileExtension;
+            // Загружаем конфигурацию для аудио
+            $audioConfig = require_once __DIR__ . '/config/audio.php';
+            
+            // Генерируем новое имя файла
+            $fileName = AudioFileHelper::generateFilename($audioTitle);
+            $uploadDir = AudioFileHelper::ensureFragmentDirectory($fragmentId);
             $filePath = $uploadDir . $fileName;
+            
+            // Если подтверждена перезапись, удаляем старые файлы и разметку
+            if ($confirmed) {
+                $stmt = $pdo->prepare("SELECT filename, original_filename FROM audio_tracks WHERE id = ?");
+                $stmt->execute([$audioId]);
+                $oldFileData = $stmt->fetch();
+                
+                if ($oldFileData) {
+                    // Удаляем текущий файл
+                    if ($oldFileData['filename']) {
+                        $oldFilePath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $oldFileData['filename']);
+                        if (file_exists($oldFilePath)) {
+                            unlink($oldFilePath);
+                        }
+                    }
+                    
+                    // Удаляем оригинальный файл если есть
+                    if ($oldFileData['original_filename']) {
+                        $oldOriginalPath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $oldFileData['original_filename']);
+                        if (file_exists($oldOriginalPath)) {
+                            unlink($oldOriginalPath);
+                        }
+                    }
+                    
+                    // Удаляем разметку
+                    $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = ?");
+                    $stmt->execute([$audioId]);
+                }
+            }
             
             if (!move_uploaded_file($_FILES['audioFile']['tmp_name'], $filePath)) {
                 throw new Exception('Не удалось сохранить аудиофайл');
@@ -138,35 +205,31 @@ try {
 
             // Получаем длительность файла
             $duration = 0;
-            if (function_exists('shell_exec') && $fileExtension === 'mp3') {
+            if (function_exists('shell_exec')) {
                 $output = shell_exec("ffprobe -i '$filePath' -show_entries format=duration -v quiet -of csv=\"p=0\"");
                 if ($output !== null) {
                     $duration = floatval(trim($output));
                 }
             }
 
-            // Удаляем старый файл
-            $oldFilePath = __DIR__ . '/' . $existingAudio['file_path'];
-            if (file_exists($oldFilePath)) {
-                unlink($oldFilePath);
-            }
-            
-            // Удаляем original файл если есть
-            if ($existingAudio['original_file_path']) {
-                $oldOriginalPath = __DIR__ . '/' . $existingAudio['original_file_path'];
-                if (file_exists($oldOriginalPath)) {
-                    unlink($oldOriginalPath);
+            // Удаляем старый файл если не была подтверждена перезапись
+            if (!$confirmed && $existingAudio['filename']) {
+                $oldFilePath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $existingAudio['filename']);
+                if (file_exists($oldFilePath)) {
+                    unlink($oldFilePath);
                 }
             }
 
             // Обновляем поля файла и сбрасываем workflow
-            $updateFields['file_path'] = 'uploads/audio/' . $fileName;
+            $updateFields['filename'] = $fileName;
+            $updateFields['original_filename'] = null; // Сбрасываем обрезку
             $updateFields['duration'] = $duration;
-            $updateFields['original_file_path'] = null; // Сбрасываем обрезку
+            $updateFields['status'] = 'draft'; // Возвращаем в статус draft
             
-            $params['file_path'] = 'uploads/audio/' . $fileName;
+            $params['filename'] = $fileName;
+            $params['original_filename'] = null;
             $params['duration'] = $duration;
-            $params['original_file_path'] = null;
+            $params['status'] = 'draft';
         }
 
         // Обновляем запись
@@ -183,18 +246,20 @@ try {
         error_log("DEBUG - Affected rows: " . $stmt->rowCount());
 
     } else {
-        // РЕЖИМ ДОБАВЛЕНИЯ - используем AudioSorter для правильной вставки
+        // РЕЖИМ ДОБАВЛЕНИЯ
+        
+        // Используем AudioSorter для правильной вставки
         $audioSorter = new AudioSorter();
         $sortOrder = $audioSorter->getInsertPosition($fragmentId, $sortOrder);
 
-        // Сохраняем аудиофайл
-        $uploadDir = __DIR__ . '/uploads/audio/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-
-        $fileExtension = pathinfo($_FILES['audioFile']['name'], PATHINFO_EXTENSION);
-        $fileName = uniqid('audio_') . '.' . $fileExtension;
+        // Загружаем конфигурацию для аудио
+        $audioConfig = require_once __DIR__ . '/config/audio.php';
+        
+        // Генерируем имя файла
+        $fileName = AudioFileHelper::generateFilename($audioTitle);
+        
+        // Создаем директорию и получаем полный путь
+        $uploadDir = AudioFileHelper::ensureFragmentDirectory($fragmentId);
         $filePath = $uploadDir . $fileName;
         
         if (!move_uploaded_file($_FILES['audioFile']['tmp_name'], $filePath)) {
@@ -203,7 +268,7 @@ try {
 
         // Получаем длительность файла
         $duration = 0;
-        if (function_exists('shell_exec') && $fileExtension === 'mp3') {
+        if (function_exists('shell_exec')) {
             $output = shell_exec("ffprobe -i '$filePath' -show_entries format=duration -v quiet -of csv=\"p=0\"");
             if ($output !== null) {
                 $duration = floatval(trim($output));
@@ -213,21 +278,24 @@ try {
         // Вставляем запись в базу данных
         $stmt = $pdo->prepare("
             INSERT INTO audio_tracks 
-            (fragment_id, file_path, duration, is_ai_generated, title, sort_order, status, is_default, created_at, updated_at) 
+            (fragment_id, filename, duration, is_ai_generated, title, sort_order, status, is_default, created_at, updated_at) 
             VALUES 
-            (:fragment_id, :file_path, :duration, :is_ai_generated, :title, :sort_order, :status, :is_default, NOW(), NOW())
+            (:fragment_id, :filename, :duration, :is_ai_generated, :title, :sort_order, :status, :is_default, NOW(), NOW())
         ");
-        
+            
         $stmt->execute([
             'fragment_id' => $fragmentId,
-            'file_path' => 'uploads/audio/' . $fileName,
+            'filename' => $fileName,
             'duration' => $duration,
             'is_ai_generated' => $voiceType,
             'title' => $audioTitle,
             'sort_order' => $sortOrder,
-            'status' => $trimAudio ? 'draft' : 'active',
+            'status' => 'draft', // Всегда draft до завершения разметки
             'is_default' => 0
         ]);
+        
+        // Получаем ID созданной записи
+        $audioId = $pdo->lastInsertId();
     }
 
     // Подтверждаем транзакцию

@@ -60,8 +60,8 @@ Table poem_authors {
 Table audio_tracks {
   id                   bigint                  [pk, increment, not null]
   fragment_id          bigint                  [not null]
-  file_path            varchar(500)            [not null]
-  original_file_path   varchar(500)
+  filename             varchar(255)            [not null, note: 'Имя файла в формате title-slug-timestamp.mp3']
+  original_filename    varchar(255)            [note: 'Имя оригинального файла до обрезки']
   duration             decimal(8,3)            [not null]
   is_ai_generated      boolean                 [not null]
   title                varchar(255)            [not null]
