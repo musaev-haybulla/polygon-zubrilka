@@ -31,7 +31,6 @@ class AudioSorter
                 FROM audio_tracks 
                 WHERE fragment_id = :fragment_id 
                 AND id != :audio_id 
-                AND deleted_at IS NULL 
                 ORDER BY sort_order ASC
             ");
             $stmt->execute([
@@ -108,8 +107,7 @@ class AudioSorter
             $stmt = $this->pdo->prepare("
                 SELECT COUNT(*) 
                 FROM audio_tracks 
-                WHERE fragment_id = :fragment_id 
-                AND deleted_at IS NULL
+                WHERE fragment_id = :fragment_id
             ");
             $stmt->execute(['fragment_id' => $fragmentId]);
             $count = (int)$stmt->fetchColumn();
@@ -130,8 +128,7 @@ class AudioSorter
                     UPDATE audio_tracks 
                     SET sort_order = sort_order + 1, updated_at = NOW() 
                     WHERE fragment_id = :fragment_id 
-                    AND sort_order >= :position 
-                    AND deleted_at IS NULL
+                    AND sort_order >= :position
                 ");
                 $stmt->execute([
                     'fragment_id' => $fragmentId,
@@ -162,7 +159,6 @@ class AudioSorter
                 SELECT id 
                 FROM audio_tracks 
                 WHERE fragment_id = :fragment_id 
-                AND deleted_at IS NULL 
                 ORDER BY sort_order ASC, id ASC
             ");
             $stmt->execute(['fragment_id' => $fragmentId]);

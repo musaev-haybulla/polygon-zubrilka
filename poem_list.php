@@ -349,7 +349,7 @@ function getPoemSizeClass($size) {
                   </div>
                   <div>
                     <button class="icon-btn" @click="editAudio(audio)" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
-                    <button class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></button>
+                    <a :href="'add_audio_step2.php?id=' + audio.id" class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></a>
                     <button class="icon-btn" title="Перейти к разметке"><i class="bi bi-play-circle"></i></button>
                     <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
                   </div>
@@ -377,7 +377,7 @@ function getPoemSizeClass($size) {
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="addAudioForm" action="add_audio_step1.php" method="POST" enctype="multipart/form-data">
+        <form id="addAudioForm" method="POST" enctype="multipart/form-data" onsubmit="return false;">
           <input type="hidden" id="fragmentId" name="fragmentId">
           <input type="hidden" id="audioId" name="audioId">
           <input type="hidden" id="editMode" name="editMode" value="0">
@@ -486,12 +486,6 @@ function poemCard(poemData) {
       const voiceType = audio.is_ai ? '1' : '0';
       document.querySelector(`input[name="voiceType"][value="${voiceType}"]`).checked = true;
       
-      console.log('Edit audio:', {
-        audioId: audio.id,
-        title: audio.title,
-        voiceType: voiceType,
-        isAi: audio.is_ai
-      });
       
       // Делаем файл опциональным и скрываем чекбокс обрезки
       const audioFileInput = document.getElementById('audioFile');
@@ -604,124 +598,20 @@ function filterData() {
   }
 }
 
-// Обработчик отправки формы через AJAX
+// Упрощенный AJAX обработчик с централизованной логикой и отладкой
 document.getElementById('addAudioForm').addEventListener('submit', function(e) {
   e.preventDefault();
   
-  const formData = new FormData(this);
-  const submitBtn = document.getElementById('addAudioSubmitBtn');
-  const originalText = submitBtn.innerHTML;
+  const form = e.target;
+  const formData = new FormData(form);
   const progressContainer = document.getElementById('uploadProgress');
   const progressBar = document.getElementById('uploadProgressBar');
+  const submitBtn = document.getElementById('addAudioSubmitBtn');
+  const originalText = submitBtn.innerHTML;
   
-  // Показываем прогресс-бар и скрываем кнопку
+  // Показываем прогресс
   progressContainer.style.display = 'block';
   submitBtn.style.display = 'none';
-  
-  // Создаем XMLHttpRequest для отслеживания прогресса
-  const xhr = new XMLHttpRequest();
-  
-  // Обработчик прогресса загрузки
-  xhr.upload.addEventListener('progress', function(e) {
-    if (e.lengthComputable) {
-      const percentComplete = Math.round((e.loaded / e.total) * 100);
-      progressBar.style.width = percentComplete + '%';
-      progressBar.textContent = percentComplete + '%';
-    }
-  });
-  
-  // Обработчик завершения
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      try {
-        const response = JSON.parse(xhr.responseText);
-        
-        if (response.warning) {
-          // Показываем предупреждение и запрашиваем подтверждение
-          const confirmed = confirm(response.warning);
-          
-          if (confirmed) {
-            // Пользователь подтвердил - повторно отправляем с confirmed=true
-            document.getElementById('confirmed').value = '1';
-            
-            // Сбрасываем прогресс и отправляем заново
-            progressBar.style.width = '0%';
-            progressBar.textContent = '0%';
-            
-            const newXhr = new XMLHttpRequest();
-            const newFormData = new FormData(document.getElementById('addAudioForm'));
-            
-            newXhr.upload.addEventListener('progress', function(e) {
-              if (e.lengthComputable) {
-                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                progressBar.style.width = percentComplete + '%';
-                progressBar.textContent = percentComplete + '%';
-              }
-            });
-            
-            newXhr.onload = function() {
-              if (newXhr.status === 200) {
-                progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-                progressBar.classList.add('bg-success');
-                progressBar.textContent = 'Загрузка завершена!';
-                
-                setTimeout(() => {
-                  const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
-                  modal.hide();
-                  window.location.reload();
-                }, 1000);
-              } else {
-                handleError('Ошибка при загрузке файла');
-              }
-            };
-            
-            newXhr.onerror = () => handleError('Ошибка сети');
-            newXhr.open('POST', 'add_audio_step1.php');
-            newXhr.send(newFormData);
-            
-          } else {
-            // Пользователь отменил - сбрасываем состояние
-            resetUploadState();
-          }
-        } else {
-          // Обычная успешная загрузка
-          progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-          progressBar.classList.add('bg-success');
-          progressBar.textContent = 'Загрузка завершена!';
-          
-          setTimeout(() => {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
-            modal.hide();
-            window.location.reload();
-          }, 1000);
-        }
-      } catch (e) {
-        // Не JSON ответ - обрабатываем как обычно
-        progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-        progressBar.classList.add('bg-success');
-        progressBar.textContent = 'Загрузка завершена!';
-        
-        setTimeout(() => {
-          const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
-          modal.hide();
-          window.location.reload();
-        }, 1000);
-      }
-    } else {
-      handleError('Ошибка при загрузке файла');
-    }
-  };
-  
-  function handleError(message) {
-    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-    progressBar.classList.add('bg-danger');
-    progressBar.textContent = 'Ошибка загрузки';
-    alert(message);
-    resetUploadState();
-  }
-  
-  // Обработчик ошибки сети
-  xhr.onerror = () => handleError('Произошла ошибка сети при загрузке файла');
   
   // Функция сброса состояния загрузки
   function resetUploadState() {
@@ -732,14 +622,113 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
       submitBtn.disabled = false;
       progressBar.style.width = '0%';
       progressBar.textContent = '0%';
-      progressBar.classList.remove('bg-success', 'bg-danger');
+      progressBar.classList.remove('bg-success', 'bg-danger', 'bg-info');
       progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
     }, 2000);
   }
   
-  // Отправляем запрос
-  xhr.open('POST', 'add_audio_step1.php');
-  xhr.send(formData);
+  function handleError(message) {
+    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+    progressBar.classList.add('bg-danger');
+    progressBar.textContent = 'Ошибка загрузки';
+    alert(message);
+    resetUploadState();
+  }
+  
+  // Простая обработка успешного ответа
+  function handleSuccess(audioId) {
+    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+    
+    // Проверяем нужно ли перейти к обрезке
+    const trimAudio = document.getElementById('trimAudio').checked;
+    
+    if (trimAudio && audioId > 0) {
+      progressBar.classList.add('bg-info');
+      progressBar.textContent = 'Переход к обрезке...';
+      
+      setTimeout(() => {
+        window.location.href = `add_audio_step2.php?id=${audioId}`;
+      }, 500);
+    } else {
+      progressBar.classList.add('bg-success');
+      progressBar.textContent = 'Загрузка завершена!';
+      
+      setTimeout(() => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
+        modal.hide();
+        window.location.reload();
+      }, 1000);
+    }
+  }
+  
+  // Функция отправки запроса (можем переиспользовать для повторной отправки)
+  function sendRequest(requestFormData, isRetry = false) {
+    const xhr = new XMLHttpRequest();
+    
+    // Обработчик прогресса загрузки
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percentComplete = Math.round((e.loaded / e.total) * 100);
+        progressBar.style.width = percentComplete + '%';
+        progressBar.textContent = percentComplete + '%';
+      }
+    });
+    
+    // Обработчик завершения
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          
+          if (response.warning) {
+            const confirmed = confirm(response.warning);
+            
+            if (confirmed) {
+              document.getElementById('confirmed').value = '1';
+              progressBar.style.width = '0%';
+              progressBar.textContent = '0%';
+              
+              const retryFormData = new FormData(form);
+              sendRequest(retryFormData, true);
+            } else {
+              resetUploadState();
+            }
+            return;
+          }
+          
+          // Успешная загрузка
+          if (response.success) {
+            const audioId = response.audio_id;
+            handleSuccess(audioId);
+          } else {
+            handleError('Неожиданный ответ сервера');
+          }
+          
+        } catch (e) {
+          console.error('JSON parse error:', e);
+          console.error('Response was:', xhr.responseText);
+          handleError('Ошибка парсинга ответа сервера');
+        }
+        
+      } else {
+        handleError('Ошибка HTTP: ' + xhr.status);
+      }
+    };
+    
+    // Обработчик ошибки сети
+    xhr.onerror = () => {
+      console.error('Network error occurred');
+      handleError('Произошла ошибка сети при загрузке файла');
+    };
+    
+    // Отправляем запрос
+    xhr.open('POST', 'add_audio_step1.php');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(requestFormData);
+  }
+  
+  // Отправляем первоначальный запрос
+  sendRequest(formData)
 });
 
 

@@ -124,7 +124,7 @@ class DatabaseHelper
             LEFT JOIN `poem_authors` pa ON p.id = pa.poem_id
             LEFT JOIN `authors` a ON pa.author_id = a.id
             LEFT JOIN `lines` l ON f.id = l.fragment_id
-            LEFT JOIN `audio_tracks` at ON f.id = at.fragment_id AND at.deleted_at IS NULL
+            LEFT JOIN `audio_tracks` at ON f.id = at.fragment_id
             WHERE f.deleted_at IS NULL 
             AND p.deleted_at IS NULL
             AND (l.deleted_at IS NULL OR l.id IS NULL)

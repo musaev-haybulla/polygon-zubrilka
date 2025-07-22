@@ -21,22 +21,41 @@ $pdo = getPdo();
 try {
     $pdo->beginTransaction();
 
-    // 1. Находим данные о файле
-    $stmt = $pdo->prepare("SELECT filename, fragment_id FROM audio_tracks WHERE id = :id");
+    // Находим данные о файлах
+    $stmt = $pdo->prepare("SELECT filename, original_filename, fragment_id FROM audio_tracks WHERE id = :id");
     $stmt->execute([':id' => $audioId]);
     $audioData = $stmt->fetch();
 
-    if ($audioData && $audioData['filename']) {
-        // 2. Удаляем файл с диска
-        $fullPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['filename']);
-        if (file_exists($fullPath)) {
-            unlink($fullPath);
+    if (!$audioData) {
+        echo json_encode(['success' => false, 'error' => 'Запись не найдена или уже удалена']);
+        exit;
+    }
+
+    // Решение: Hard delete - полностью удаляем из БД и файлы
+    // Это проще для управления и не создает мусор в файловой системе
+    
+    // 1. Удаляем текущий файл с диска
+    if ($audioData['filename']) {
+        $currentPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['filename']);
+        if (file_exists($currentPath)) {
+            unlink($currentPath);
+        }
+    }
+    
+    // 2. Удаляем оригинальный файл если есть
+    if ($audioData['original_filename']) {
+        $originalPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['original_filename']);
+        if (file_exists($originalPath)) {
+            unlink($originalPath);
         }
     }
 
-    // 3. Выполняем "мягкое удаление" (soft delete), устанавливая deleted_at
-    // Предполагается, что связанные данные (например, лайки) обрабатываются в БД каскадно или триггерами
-    $stmt = $pdo->prepare("UPDATE audio_tracks SET deleted_at = NOW() WHERE id = :id");
+    // 3. Удаляем связанные данные (таймкоды разметки)
+    $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = :id");
+    $stmt->execute([':id' => $audioId]);
+
+    // 4. Выполняем полное удаление записи из БД
+    $stmt = $pdo->prepare("DELETE FROM audio_tracks WHERE id = :id");
     $stmt->execute([':id' => $audioId]);
 
     $pdo->commit();

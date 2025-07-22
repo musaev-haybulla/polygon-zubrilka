@@ -81,4 +81,46 @@ class AudioFileHelper
         
         return $dir;
     }
+    
+    /**
+     * Получает путь к ffmpeg с учетом различных систем
+     */
+    public static function getFFmpegPath(): string
+    {
+        $paths = [
+            '/opt/homebrew/bin/ffmpeg',  // macOS с Homebrew (Apple Silicon)
+            '/usr/local/bin/ffmpeg',     // macOS с Homebrew (Intel)
+            '/usr/bin/ffmpeg',           // Linux системы
+            'ffmpeg'                     // Fallback в PATH
+        ];
+        
+        foreach ($paths as $path) {
+            if ($path === 'ffmpeg' || file_exists($path)) {
+                return $path;
+            }
+        }
+        
+        return 'ffmpeg'; // Последний fallback
+    }
+    
+    /**
+     * Получает путь к ffprobe с учетом различных систем
+     */
+    public static function getFFprobePath(): string
+    {
+        $paths = [
+            '/opt/homebrew/bin/ffprobe',  // macOS с Homebrew (Apple Silicon)
+            '/usr/local/bin/ffprobe',     // macOS с Homebrew (Intel)
+            '/usr/bin/ffprobe',           // Linux системы
+            'ffprobe'                     // Fallback в PATH
+        ];
+        
+        foreach ($paths as $path) {
+            if ($path === 'ffprobe' || file_exists($path)) {
+                return $path;
+            }
+        }
+        
+        return 'ffprobe'; // Последний fallback
+    }
 }

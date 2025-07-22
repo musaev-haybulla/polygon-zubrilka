@@ -35,12 +35,6 @@ $voiceType = (int)($_POST['voiceType'] ?? 0);
 $sortOrder = (int)($_POST['sortOrder'] ?? 1); // Сортировка доступна в обоих режимах
 $trimAudio = !empty($_POST['trimAudio']);
 
-// Отладочное логирование
-error_log("DEBUG - Edit mode: " . ($editMode ? 'YES' : 'NO'));
-error_log("DEBUG - Audio ID: " . $audioId);
-error_log("DEBUG - Title: " . $audioTitle);
-error_log("DEBUG - Voice type: " . $voiceType);
-error_log("DEBUG - POST data: " . print_r($_POST, true));
 
 if ($fragmentId <= 0 || empty($audioTitle)) {
     header('Location: poem_list.php?error=invalid_data');
@@ -79,7 +73,7 @@ try {
         $stmt = $pdo->prepare("
             SELECT id, filename 
             FROM audio_tracks 
-            WHERE id = :audio_id AND fragment_id = :fragment_id AND deleted_at IS NULL
+            WHERE id = :audio_id AND fragment_id = :fragment_id
         ");
         $stmt->execute(['audio_id' => $audioId, 'fragment_id' => $fragmentId]);
         $existingAudio = $stmt->fetch();
@@ -236,14 +230,8 @@ try {
         $setClause = implode(', ', array_map(fn($field) => "$field = :$field", array_keys($updateFields)));
         $sql = "UPDATE audio_tracks SET $setClause WHERE id = :audio_id";
         
-        error_log("DEBUG - SQL: " . $sql);
-        error_log("DEBUG - Params: " . print_r($params, true));
-        
         $stmt = $pdo->prepare($sql);
         $result = $stmt->execute($params);
-        
-        error_log("DEBUG - Update result: " . ($result ? 'SUCCESS' : 'FAILED'));
-        error_log("DEBUG - Affected rows: " . $stmt->rowCount());
 
     } else {
         // РЕЖИМ ДОБАВЛЕНИЯ
@@ -269,7 +257,8 @@ try {
         // Получаем длительность файла
         $duration = 0;
         if (function_exists('shell_exec')) {
-            $output = shell_exec("ffprobe -i '$filePath' -show_entries format=duration -v quiet -of csv=\"p=0\"");
+            $cmd = sprintf("%s -i '%s' -show_entries format=duration -v quiet -of csv=\"p=0\"", AudioFileHelper::getFFprobePath(), $filePath);
+            $output = shell_exec($cmd);
             if ($output !== null) {
                 $duration = floatval(trim($output));
             }
@@ -283,7 +272,7 @@ try {
             (:fragment_id, :filename, :duration, :is_ai_generated, :title, :sort_order, :status, :is_default, NOW(), NOW())
         ");
             
-        $stmt->execute([
+        $insertResult = $stmt->execute([
             'fragment_id' => $fragmentId,
             'filename' => $fileName,
             'duration' => $duration,
@@ -294,20 +283,50 @@ try {
             'is_default' => 0
         ]);
         
+        if (!$insertResult) {
+            throw new Exception('Не удалось вставить запись в базу данных');
+        }
+        
         // Получаем ID созданной записи
-        $audioId = $pdo->lastInsertId();
+        $audioId = (int)$pdo->lastInsertId();
+        
+        // Fallback: если lastInsertId не сработал, ищем запись вручную
+        if ($audioId === 0) {
+            $stmt2 = $pdo->prepare("SELECT id FROM audio_tracks WHERE fragment_id = ? AND filename = ? ORDER BY id DESC LIMIT 1");
+            $stmt2->execute([$fragmentId, $fileName]);
+            $manualResult = $stmt2->fetch();
+            $audioId = $manualResult ? (int)$manualResult['id'] : 0;
+        }
+        
     }
 
     // Подтверждаем транзакцию
     $pdo->commit();
+    
 
     // Определяем куда перенаправлять
     if ($editMode) {
         header('Location: poem_list.php?success=audio_updated');
     } else {
-        // Режим добавления
+        // Режим добавления  
+        // Переменная $audioId уже содержит корректное значение,
+        // полученное внутри блока try-catch.
+        
+        
+        // Если запрос AJAX, возвращаем JSON с ID
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            // Очищаем буфер вывода перед отправкой JSON
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => true, 'audio_id' => $audioId]);
+            exit;
+        }
+        
+        // Обычный HTTP редирект для не-AJAX запросов
         if ($trimAudio) {
-            $audioId = $pdo->lastInsertId();
             header("Location: add_audio_step2.php?id=$audioId");
         } else {
             header('Location: poem_list.php?success=audio_added');

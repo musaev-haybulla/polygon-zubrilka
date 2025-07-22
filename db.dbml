@@ -67,10 +67,8 @@ Table audio_tracks {
   title                varchar(255)            [not null]
   sort_order           int                     [not null]
   status               enum('draft', 'active') [not null, default: 'draft']
-  is_default           boolean                 [not null]
   created_at           datetime                [not null]
   updated_at           datetime                [not null]
-  deleted_at           datetime
 }
 
 Table audio_timings {
