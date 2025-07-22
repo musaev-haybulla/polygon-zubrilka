@@ -214,6 +214,12 @@ function getPoemSizeClass($size) {
       color: #6c757d;
       margin: 12px 0 8px 0;
     }
+    
+    /* Анимация загрузки */
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -375,6 +381,7 @@ function getPoemSizeClass($size) {
           <input type="hidden" id="fragmentId" name="fragmentId">
           <input type="hidden" id="audioId" name="audioId">
           <input type="hidden" id="editMode" name="editMode" value="0">
+          <input type="hidden" id="confirmed" name="confirmed" value="0">
           <div class="mb-3">
             <label for="audioTitle" class="form-label">Название озвучки</label>
             <input type="text" class="form-control" id="audioTitle" name="audioTitle" required>
@@ -412,12 +419,23 @@ function getPoemSizeClass($size) {
             <label class="form-check-label" for="trimAudio"><strong>Обрезать аудиофайл?</strong></label>
             <small class="form-text text-muted d-block">Позволит на следующем шаге удалить тишину или лишние фрагменты в начале и конце озвучки.</small>
           </div>
+          
+          <!-- Прогресс-бар загрузки -->
+          <div class="mb-3" id="uploadProgress" style="display: none;">
+            <label class="form-label">Загрузка файла</label>
+            <div class="progress">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                   role="progressbar" 
+                   id="uploadProgressBar"
+                   style="width: 0%">0%</div>
+            </div>
+          </div>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
         <div id="addModeButtons">
-          <button type="submit" form="addAudioForm" class="btn btn-primary">Далее</button>
+          <button type="submit" form="addAudioForm" class="btn btn-primary" id="addAudioSubmitBtn">Далее</button>
         </div>
         <div id="editModeButtons" style="display: none;">
           <button type="submit" form="addAudioForm" class="btn btn-success" data-action="save">Сохранить</button>
@@ -586,6 +604,145 @@ function filterData() {
   }
 }
 
+// Обработчик отправки формы через AJAX
+document.getElementById('addAudioForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  const submitBtn = document.getElementById('addAudioSubmitBtn');
+  const originalText = submitBtn.innerHTML;
+  const progressContainer = document.getElementById('uploadProgress');
+  const progressBar = document.getElementById('uploadProgressBar');
+  
+  // Показываем прогресс-бар и скрываем кнопку
+  progressContainer.style.display = 'block';
+  submitBtn.style.display = 'none';
+  
+  // Создаем XMLHttpRequest для отслеживания прогресса
+  const xhr = new XMLHttpRequest();
+  
+  // Обработчик прогресса загрузки
+  xhr.upload.addEventListener('progress', function(e) {
+    if (e.lengthComputable) {
+      const percentComplete = Math.round((e.loaded / e.total) * 100);
+      progressBar.style.width = percentComplete + '%';
+      progressBar.textContent = percentComplete + '%';
+    }
+  });
+  
+  // Обработчик завершения
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        const response = JSON.parse(xhr.responseText);
+        
+        if (response.warning) {
+          // Показываем предупреждение и запрашиваем подтверждение
+          const confirmed = confirm(response.warning);
+          
+          if (confirmed) {
+            // Пользователь подтвердил - повторно отправляем с confirmed=true
+            document.getElementById('confirmed').value = '1';
+            
+            // Сбрасываем прогресс и отправляем заново
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            
+            const newXhr = new XMLHttpRequest();
+            const newFormData = new FormData(document.getElementById('addAudioForm'));
+            
+            newXhr.upload.addEventListener('progress', function(e) {
+              if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percentComplete + '%';
+                progressBar.textContent = percentComplete + '%';
+              }
+            });
+            
+            newXhr.onload = function() {
+              if (newXhr.status === 200) {
+                progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                progressBar.classList.add('bg-success');
+                progressBar.textContent = 'Загрузка завершена!';
+                
+                setTimeout(() => {
+                  const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
+                  modal.hide();
+                  window.location.reload();
+                }, 1000);
+              } else {
+                handleError('Ошибка при загрузке файла');
+              }
+            };
+            
+            newXhr.onerror = () => handleError('Ошибка сети');
+            newXhr.open('POST', 'add_audio_step1.php');
+            newXhr.send(newFormData);
+            
+          } else {
+            // Пользователь отменил - сбрасываем состояние
+            resetUploadState();
+          }
+        } else {
+          // Обычная успешная загрузка
+          progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+          progressBar.classList.add('bg-success');
+          progressBar.textContent = 'Загрузка завершена!';
+          
+          setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
+            modal.hide();
+            window.location.reload();
+          }, 1000);
+        }
+      } catch (e) {
+        // Не JSON ответ - обрабатываем как обычно
+        progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        progressBar.classList.add('bg-success');
+        progressBar.textContent = 'Загрузка завершена!';
+        
+        setTimeout(() => {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
+          modal.hide();
+          window.location.reload();
+        }, 1000);
+      }
+    } else {
+      handleError('Ошибка при загрузке файла');
+    }
+  };
+  
+  function handleError(message) {
+    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+    progressBar.classList.add('bg-danger');
+    progressBar.textContent = 'Ошибка загрузки';
+    alert(message);
+    resetUploadState();
+  }
+  
+  // Обработчик ошибки сети
+  xhr.onerror = () => handleError('Произошла ошибка сети при загрузке файла');
+  
+  // Функция сброса состояния загрузки
+  function resetUploadState() {
+    setTimeout(() => {
+      progressContainer.style.display = 'none';
+      submitBtn.style.display = 'inline-block';
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+      progressBar.style.width = '0%';
+      progressBar.textContent = '0%';
+      progressBar.classList.remove('bg-success', 'bg-danger');
+      progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+    }, 2000);
+  }
+  
+  // Отправляем запрос
+  xhr.open('POST', 'add_audio_step1.php');
+  xhr.send(formData);
+});
+
+
 const addAudioModal = document.getElementById('addAudioModal');
 if (addAudioModal) {
     addAudioModal.addEventListener('show.bs.modal', event => {
@@ -651,7 +808,32 @@ if (addAudioModal) {
     // Сбрасываем режим редактирования при закрытии модалки
     addAudioModal.addEventListener('hidden.bs.modal', event => {
       document.getElementById('editMode').value = '0';
+      document.getElementById('confirmed').value = '0';
       document.getElementById('addAudioForm').reset();
+      
+      // Показываем все скрытые поля обратно
+      document.getElementById('audioTitle').closest('.mb-3').style.display = 'block';
+      document.querySelector('input[name="voiceType"]').closest('.mb-3').style.display = 'block';
+      document.getElementById('sortOrder').closest('.mb-3').style.display = 'block';
+      document.getElementById('trimAudio').closest('.mb-3').style.display = 'block';
+      
+      // Скрываем прогресс-бар и возвращаем кнопки
+      document.getElementById('uploadProgress').style.display = 'none';
+      const submitBtn = document.getElementById('addAudioSubmitBtn');
+      const editButtons = document.getElementById('editModeButtons');
+      submitBtn.style.display = 'inline-block';
+      submitBtn.disabled = false;
+      editButtons.style.display = 'block';
+      
+      // Сбрасываем прогресс-бар
+      const progressBar = document.getElementById('uploadProgressBar');
+      progressBar.style.width = '0%';
+      progressBar.textContent = '0%';
+      progressBar.classList.remove('bg-success', 'bg-danger');
+      progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+      
+      // Возвращаем оригинальный текст кнопки
+      document.querySelector('#addModeButtons button').textContent = 'Далее';
     });
     
     // Обработчики для кнопок редактирования
@@ -666,46 +848,96 @@ if (addAudioModal) {
         // Устанавливаем нужное действие
         formData.set('editAction', action);
         
-        fetch('add_audio_step1.php', {
-          method: 'POST',
-          body: formData
-        })
-        .then(response => {
-          if (response.ok) {
-            if (action === 'save') {
-              // Обычное сохранение - обновляем интерфейс
-              const cards = document.querySelectorAll('[x-data]');
-              cards.forEach(card => {
-                if (card._x_dataStack) {
-                  const poemData = card._x_dataStack[0];
-                  if (poemData && poemData.audios) {
-                    const audioIndex = poemData.audios.findIndex(a => a.id == audioId);
-                    if (audioIndex !== -1) {
-                      poemData.audios[audioIndex].title = formData.get('audioTitle');
-                      poemData.audios[audioIndex].is_ai = formData.get('voiceType') === '1';
-                      poemData.audios[audioIndex].sort_order = parseInt(formData.get('sortOrder'));
-                      poemData.audios.sort((a, b) => a.sort_order - b.sort_order);
+        // Показываем прогресс-бар и скрываем кнопки редактирования
+        const progressContainer = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('uploadProgressBar');
+        const editButtons = document.getElementById('editModeButtons');
+        
+        progressContainer.style.display = 'block';
+        editButtons.style.display = 'none';
+        
+        // Создаем XMLHttpRequest для отслеживания прогресса
+        const xhr = new XMLHttpRequest();
+        
+        // Обработчик прогресса загрузки (если есть файл)
+        xhr.upload.addEventListener('progress', function(e) {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressBar.textContent = percentComplete + '%';
+          }
+        });
+        
+        // Обработчик завершения
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            // Успешное сохранение
+            progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+            progressBar.classList.add('bg-success');
+            progressBar.textContent = 'Сохранение завершено!';
+            
+            setTimeout(() => {
+              if (action === 'save') {
+                // Обычное сохранение - обновляем интерфейс и закрываем модалку
+                const cards = document.querySelectorAll('[x-data]');
+                cards.forEach(card => {
+                  if (card._x_dataStack) {
+                    const poemData = card._x_dataStack[0];
+                    if (poemData && poemData.audios) {
+                      const audioIndex = poemData.audios.findIndex(a => a.id == audioId);
+                      if (audioIndex !== -1) {
+                        poemData.audios[audioIndex].title = formData.get('audioTitle');
+                        poemData.audios[audioIndex].is_ai = formData.get('voiceType') === '1';
+                        poemData.audios[audioIndex].sort_order = parseInt(formData.get('sortOrder'));
+                        poemData.audios.sort((a, b) => a.sort_order - b.sort_order);
+                      }
                     }
                   }
-                }
-              });
-              const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
-              modal.hide();
-            } else if (action === 'save-and-trim') {
-              // Переход на страницу обрезки
-              window.location.href = `add_audio_step2.php?id=${audioId}`;
-            } else if (action === 'save-and-markup') {
-              // Переход на страницу разметки
-              window.location.href = `add_audio_step3.php?id=${audioId}`;
-            }
+                });
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
+                modal.hide();
+              } else if (action === 'save-and-trim') {
+                // Переход на страницу обрезки
+                window.location.href = `add_audio_step2.php?id=${audioId}`;
+              } else if (action === 'save-and-markup') {
+                // Переход на страницу разметки
+                window.location.href = `add_audio_step3.php?id=${audioId}`;
+              }
+            }, 1000);
           } else {
+            // Ошибка сохранения
+            progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+            progressBar.classList.add('bg-danger');
+            progressBar.textContent = 'Ошибка сохранения';
             alert('Ошибка при сохранении изменений');
+            resetEditState();
           }
-        })
-        .catch(error => {
-          console.error('Network error:', error);
+        };
+        
+        // Обработчик ошибки сети
+        xhr.onerror = function() {
+          progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+          progressBar.classList.add('bg-danger');
+          progressBar.textContent = 'Ошибка сети';
           alert('Произошла ошибка сети');
-        });
+          resetEditState();
+        };
+        
+        // Функция сброса состояния редактирования
+        function resetEditState() {
+          setTimeout(() => {
+            progressContainer.style.display = 'none';
+            editButtons.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            progressBar.classList.remove('bg-success', 'bg-danger');
+            progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+          }, 2000);
+        }
+        
+        // Отправляем запрос
+        xhr.open('POST', 'add_audio_step1.php');
+        xhr.send(formData);
       }
     });
 }
