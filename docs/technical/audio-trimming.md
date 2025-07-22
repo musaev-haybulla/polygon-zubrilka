@@ -1,167 +1,62 @@
 # Техническая спецификация: Обрезка аудиофайлов
 
 ## Обзор
-Система обрезки позволяет пользователю выбрать нужный фрагмент аудиофайла через waveform-интерфейс и создать обрезанную версию, сохранив при этом оригинал.
+Система обрезки позволяет пользователю выбрать нужный фрагмент аудиофайла через waveform-интерфейс и создать его урезанную версию, сохранив при этом оригинал для возможности отката.
 
-## Workflow обрезки
+## Логика процесса
 
-### 1. Пользовательский интерфейс
-- Отображение waveform загруженного аудиофайла
-- Возможность выбора начальной и конечной точки обрезки
-- Предварительное прослушивание выбранного фрагмента
-- Кнопка "Применить обрезку"
+### 1. Состояние до обрезки
+- **Файловая система:** В директории озвучки (например, `uploads/audio/{poem_id}/`) лежит один файл, например `audio.mp3`.
+- **База данных (таблица `audio_tracks`):**
+    - `filename`: 'audio.mp3'
+    - `original_filename`: NULL
+    - `duration`: (длительность `audio.mp3`)
 
-### 2. Обработка на сервере (add_audio_step2.php)
+### 2. Процесс обрезки
+1.  **Интерфейс:** Пользователь в waveform-редакторе выбирает начальное (`start_time`) и конечное (`end_time`) время для нового фрагмента.
+2.  **Сервер (Бэкенд):**
+    - Получает ID озвучки, `start_time` и `end_time`.
+    - **Проверяет** корректность данных (файл существует, `start_time` < `end_time`).
+    - **Формирует имена:**
+        - Имя оригинального файла остается прежним.
+        - Имя для нового, обрезанного файла генерируется на основе оригинального (например, `audio-trimmed.mp3`).
+    - **Выполняет обрезку:** С помощью **FFmpeg** из исходного файла создается новый, обрезанный файл.
+        ```bash
+        ffmpeg -i "исходный_файл.mp3" -ss [start_time] -to [end_time] -c copy "обрезанный_файл.mp3"
+        ```
+    - **Обновляет базу данных:**
+        - `filename` теперь указывает на новый, обрезанный файл (`audio-trimmed.mp3`).
+        - `original_filename` сохраняет имя исходного файла (`audio.mp3`).
+        - `duration` пересчитывается и устанавливается равным `end_time - start_time`.
 
-#### Входные данные:
-```php
-$audioId = $_POST['audio_id'];
-$startTime = (float)$_POST['start_time']; // в секундах
-$endTime = (float)$_POST['end_time'];     // в секундах
-```
+### 3. Состояние после обрезки
+- **Файловая система:** В директории озвучки теперь два файла:
+    - `audio.mp3` (оригинал)
+    - `audio-trimmed.mp3` (активная, обрезанная версия)
+- **База данных:**
+    - `filename`: 'audio-trimmed.mp3'
+    - `original_filename`: 'audio.mp3'
+    - `duration`: (длительность обрезанного фрагмента)
 
-#### Процесс обрезки:
-```php
-// 1. Получаем данные аудиозаписи
-$audioData = getAudioById($audioId);
-$originalFilename = $audioData['filename'];
+## Ключевые операции
 
-// 2. Создаём имя для обрезанного файла
-$trimmedFilename = str_replace('.mp3', '-trimmed.mp3', $originalFilename);
+### Вычисление длительности
+- Длительность аудиофайла должна получаться с помощью **FFprobe**. Это гарантирует точность.
+    ```bash
+    ffprobe -i "файл.mp3" -show_entries format=duration -v quiet -of csv="p=0"
+    ```
+- Поле `duration` в базе данных **всегда** отражает длительность файла, указанного в поле `filename`.
 
-// 3. Формируем пути к файлам
-$originalPath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $originalFilename);
-$trimmedPath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $trimmedFilename);
+### Откат к оригиналу
+- Пользователь может отменить обрезку и вернуться к исходной версии аудио.
+- **Процесс отката:**
+    1.  **Обновление БД:**
+        - Значение из `original_filename` копируется в `filename`.
+        - `original_filename` устанавливается в `NULL`.
+        - `duration` пересчитывается для оригинального файла.
+    2.  **Очистка ФС:** Обрезанный файл (`audio-trimmed.mp3`) удаляется.
 
-// 4. Выполняем обрезку через FFmpeg
-$cmd = sprintf(
-    "ffmpeg -i '%s' -ss %.3f -to %.3f -c copy '%s'",
-    $originalPath,
-    $startTime,
-    $endTime,
-    $trimmedPath
-);
-exec($cmd, $output, $returnCode);
-
-// 5. Вычисляем новую длительность
-$newDuration = $endTime - $startTime;
-
-// 6. Обновляем базу данных
-UPDATE audio_tracks SET 
-    filename = $trimmedFilename,
-    original_filename = $originalFilename, 
-    duration = $newDuration
-WHERE id = $audioId;
-```
-
-## Управление полем duration
-
-### Принцип работы
-Поле `duration` всегда содержит длительность **текущего активного файла**, который будет использоваться для воспроизведения и разметки.
-
-### Сценарии обновления:
-
-#### Первоначальная загрузка:
-```php
-$duration = getDurationFromFile($uploadedFile);
-// duration = длительность загруженного файла
-```
-
-#### После обрезки:
-```php
-$newDuration = $endTime - $startTime;
-// duration = длительность обрезанного фрагмента
-```
-
-#### При откате к оригиналу:
-```php
-$originalDuration = getDurationFromFile($originalFile);
-// duration = длительность оригинального файла
-```
-
-## Структура файлов
-
-### До обрезки:
-```
-uploads/audio/5/
-└── muzhichok-s-nogtok-1734567890.mp3
-```
-
-### После обрезки:
-```
-uploads/audio/5/
-├── muzhichok-s-nogtok-1734567890.mp3          # оригинал
-└── muzhichok-s-nogtok-1734567890-trimmed.mp3  # обрезка (активный)
-```
-
-## Состояния в базе данных
-
-### До обрезки:
-```sql
-filename = 'muzhichok-s-nogtok-1734567890.mp3'
-original_filename = NULL
-duration = 125.50
-```
-
-### После обрезки:
-```sql
-filename = 'muzhichok-s-nogtok-1734567890-trimmed.mp3'
-original_filename = 'muzhichok-s-nogtok-1734567890.mp3'
-duration = 34.70  -- длительность обрезанного фрагмента
-```
-
-## Функции для работы с FFmpeg
-
-### Получение длительности файла:
-```php
-function getDurationFromFile(string $filePath): float {
-    $cmd = sprintf("ffprobe -i '%s' -show_entries format=duration -v quiet -of csv=\"p=0\"", $filePath);
-    $output = shell_exec($cmd);
-    return $output ? floatval(trim($output)) : 0.0;
-}
-```
-
-### Обрезка файла:
-```php
-function trimAudioFile(string $inputPath, string $outputPath, float $startTime, float $endTime): bool {
-    $cmd = sprintf(
-        "ffmpeg -i '%s' -ss %.3f -to %.3f -c copy '%s' 2>&1",
-        $inputPath,
-        $startTime, 
-        $endTime,
-        $outputPath
-    );
-    
-    exec($cmd, $output, $returnCode);
-    return $returnCode === 0;
-}
-```
-
-## Обработка ошибок
-
-### Проверки перед обрезкой:
-- Существование оригинального файла
-- Корректность временных меток (start < end)
-- Доступность FFmpeg на сервере
-- Права на запись в целевую директорию
-
-### Откат при ошибках:
-При неудачной обрезке необходимо:
-1. Удалить частично созданный файл
-2. Сохранить исходное состояние в БД
-3. Вернуть пользователю информативное сообщение об ошибке
-
-## Возможность отката
-
-Пользователь может вернуться к оригинальному файлу:
-```php
-// Восстановление оригинала
-UPDATE audio_tracks SET 
-    filename = original_filename,
-    original_filename = NULL,
-    duration = (вычисляем из оригинального файла)
-WHERE id = $audioId;
-
-// Удаляем обрезанную версию
-unlink($trimmedFilePath);
-```
+## Требования к безопасности и обработке ошибок
+- **Валидация:** Всегда проверять входные данные от пользователя (ID, временные метки).
+- **Доступность FFmpeg:** Система должна проверять наличие FFmpeg/FFprobe на сервере.
+- **Транзакционность:** В случае ошибки при выполнении команды `ffmpeg` (например, некорректные временные метки), необходимо удалить любые созданные артефакты (пустые или частично обрезанные файлы) и не вносить изменений в базу данных. Пользователю должно быть возвращено информативное сообщение об ошибке.
