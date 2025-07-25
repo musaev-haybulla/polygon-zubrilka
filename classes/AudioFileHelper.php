@@ -123,4 +123,43 @@ class AudioFileHelper
         
         return 'ffprobe'; // Последний fallback
     }
+
+    /**
+     * Удаляет связанные с аудиозаписью файлы (основной, оригинальный)
+     * и тайминги из БД.
+     *
+     * @param PDO $pdo
+     * @param int $audioId
+     * @return bool
+     */
+    public static function deleteAudioFiles(PDO $pdo, int $audioId): bool
+    {
+        // 1. Получаем информацию о файлах и fragment_id
+        $stmt = $pdo->prepare("SELECT fragment_id, filename, original_filename FROM audio_tracks WHERE id = ?");
+        $stmt->execute([$audioId]);
+        $audioData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$audioData) {
+            // Аудиозапись не найдена, нечего удалять
+            return true; 
+        }
+
+        $fragmentId = (int)$audioData['fragment_id'];
+
+        // 2. Удаляем физические файлы
+        $filesToDelete = array_filter([$audioData['filename'], $audioData['original_filename']]);
+        
+        foreach ($filesToDelete as $filename) {
+            $filePath = self::getAbsoluteAudioPath($fragmentId, $filename);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+        }
+
+        // 3. Удаляем разметку (тайминги) из БД
+        $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = ?");
+        $stmt->execute([$audioId]);
+
+        return true;
+    }
 }

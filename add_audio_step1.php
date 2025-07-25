@@ -166,31 +166,7 @@ try {
             
             // Если подтверждена перезапись, удаляем старые файлы и разметку
             if ($confirmed) {
-                $stmt = $pdo->prepare("SELECT filename, original_filename FROM audio_tracks WHERE id = ?");
-                $stmt->execute([$audioId]);
-                $oldFileData = $stmt->fetch();
-                
-                if ($oldFileData) {
-                    // Удаляем текущий файл
-                    if ($oldFileData['filename']) {
-                        $oldFilePath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $oldFileData['filename']);
-                        if (file_exists($oldFilePath)) {
-                            unlink($oldFilePath);
-                        }
-                    }
-                    
-                    // Удаляем оригинальный файл если есть
-                    if ($oldFileData['original_filename']) {
-                        $oldOriginalPath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $oldFileData['original_filename']);
-                        if (file_exists($oldOriginalPath)) {
-                            unlink($oldOriginalPath);
-                        }
-                    }
-                    
-                    // Удаляем разметку
-                    $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = ?");
-                    $stmt->execute([$audioId]);
-                }
+                AudioFileHelper::deleteAudioFiles($pdo, $audioId);
             }
             
             if (!move_uploaded_file($_FILES['audioFile']['tmp_name'], $filePath)) {
