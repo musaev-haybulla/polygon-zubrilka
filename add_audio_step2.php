@@ -70,9 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($returnCode !== 0) {
             // Удаляем частично созданный файл если есть
-            if (file_exists($trimmedPath)) {
-                unlink($trimmedPath);
-            }
+            AudioFileHelper::deleteAudioFile($audioData['fragment_id'], $trimmedFilename);
             throw new Exception('Ошибка при обрезке файла: ' . implode('\n', $output));
         }
         
@@ -108,8 +106,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Удаляем файл если он был создан
-        if (isset($trimmedPath) && file_exists($trimmedPath)) {
-            unlink($trimmedPath);
+        if (isset($trimmedFilename) && isset($audioData)) {
+            AudioFileHelper::deleteAudioFile($audioData['fragment_id'], $trimmedFilename);
         }
         
         error_log("Error in add_audio_step2.php: " . $e->getMessage());
