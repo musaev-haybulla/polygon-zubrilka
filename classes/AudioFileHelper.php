@@ -125,6 +125,27 @@ class AudioFileHelper
     }
 
     /**
+     * Удаляет конкретный аудиофайл
+     *
+     * @param int $fragmentId ID фрагмента
+     * @param string $filename Имя файла
+     * @param bool $logOperation Логировать операцию
+     * @return bool Результат операции
+     */
+    public static function deleteAudioFile(int $fragmentId, string $filename, bool $logOperation = true): bool
+    {
+        $filePath = self::getAbsoluteAudioPath($fragmentId, $filename);
+        $result = self::safeUnlink($filePath);
+        
+        if ($logOperation) {
+            $error = $result ? null : 'Failed to delete file';
+            self::logFileOperation('DELETE', $filePath, $result, $error);
+        }
+        
+        return $result;
+    }
+
+    /**
      * Удаляет связанные с аудиозаписью файлы (основной, оригинальный)
      * и тайминги из БД.
      *
@@ -141,25 +162,82 @@ class AudioFileHelper
 
         if (!$audioData) {
             // Аудиозапись не найдена, нечего удалять
+            self::logFileOperation('DELETE_AUDIO_RECORD', "audio_id:{$audioId}", true, 'Audio record not found');
             return true; 
         }
 
         $fragmentId = (int)$audioData['fragment_id'];
 
-        // 2. Удаляем физические файлы
+        // 2. Удаляем физические файлы через унифицированный метод
         $filesToDelete = array_filter([$audioData['filename'], $audioData['original_filename']]);
         
         foreach ($filesToDelete as $filename) {
-            $filePath = self::getAbsoluteAudioPath($fragmentId, $filename);
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
+            self::deleteAudioFile($fragmentId, $filename, true);
         }
 
         // 3. Удаляем разметку (тайминги) из БД
         $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = ?");
         $stmt->execute([$audioId]);
 
+        self::logFileOperation('DELETE_AUDIO_RECORD', "audio_id:{$audioId}", true);
         return true;
+    }
+
+    /**
+     * Безопасно удаляет файл с проверкой существования
+     *
+     * @param string $filePath Полный путь к файлу
+     * @return bool Результат операции
+     */
+    private static function safeUnlink(string $filePath): bool
+    {
+        // Проверяем существование файла
+        if (!file_exists($filePath)) {
+            return true; // Файл не существует - считаем операцию успешной
+        }
+
+        // Проверяем права на запись в директории
+        $directory = dirname($filePath);
+        if (!is_writable($directory)) {
+            return false;
+        }
+
+        // Пытаемся удалить файл
+        try {
+            return unlink($filePath);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Логирует операцию с файлом
+     *
+     * @param string $operation Тип операции (DELETE, CREATE, etc.)
+     * @param string $filePath Путь к файлу
+     * @param bool $success Успешность операции
+     * @param string|null $error Сообщение об ошибке
+     */
+    private static function logFileOperation(string $operation, string $filePath, bool $success, ?string $error = null): void
+    {
+        $timestamp = date('Y-m-d H:i:s');
+        $status = $success ? 'SUCCESS' : 'ERROR';
+        
+        // Определяем уровень лога
+        $level = 'INFO';
+        if (!$success) {
+            $level = 'ERROR';
+        } elseif (!file_exists($filePath) && $operation === 'DELETE') {
+            $level = 'WARNING';
+            $status = 'WARNING';
+            $error = $error ?: 'File not found';
+        }
+        
+        $logMessage = "[{$timestamp}] AUDIO_FILE_OP: {$operation} {$filePath} - {$status}";
+        if ($error) {
+            $logMessage .= " ({$error})";
+        }
+        
+        error_log($logMessage);
     }
 }
