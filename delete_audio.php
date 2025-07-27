@@ -36,18 +36,12 @@ try {
     
     // 1. Удаляем текущий файл с диска
     if ($audioData['filename']) {
-        $currentPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['filename']);
-        if (file_exists($currentPath)) {
-            unlink($currentPath);
-        }
+        AudioFileHelper::deleteAudioFile($audioData['fragment_id'], $audioData['filename']);
     }
     
     // 2. Удаляем оригинальный файл если есть
     if ($audioData['original_filename']) {
-        $originalPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['original_filename']);
-        if (file_exists($originalPath)) {
-            unlink($originalPath);
-        }
+        AudioFileHelper::deleteAudioFile($audioData['fragment_id'], $audioData['original_filename']);
     }
 
     // 3. Удаляем связанные данные (таймкоды разметки)
