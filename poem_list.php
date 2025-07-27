@@ -678,6 +678,8 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
     xhr.onload = function() {
       if (xhr.status === 200) {
         try {
+          // Логируем сырой ответ для отладки
+          console.log('Raw server response:', xhr.responseText);
           const response = JSON.parse(xhr.responseText);
           
           if (response.warning) {
@@ -701,13 +703,27 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
             const audioId = response.audio_id;
             handleSuccess(audioId);
           } else {
-            handleError('Неожиданный ответ сервера');
+            const errorMessage = response.error || 'Неожиданный ответ сервера';
+            handleError(errorMessage);
           }
           
         } catch (e) {
           console.error('JSON parse error:', e);
           console.error('Response was:', xhr.responseText);
-          handleError('Ошибка парсинга ответа сервера');
+          
+          // Попробуем извлечь полезную информацию из ответа
+          let errorMessage = 'Ошибка парсинга ответа сервера';
+          if (xhr.responseText) {
+            // Если ответ содержит HTML с ошибкой PHP, попробуем найти полезную информацию
+            if (xhr.responseText.includes('Fatal error') || xhr.responseText.includes('Parse error')) {
+              errorMessage = 'Ошибка сервера. Проверьте логи для подробностей.';
+            } else if (xhr.responseText.length < 200) {
+              // Если ответ короткий, возможно это полезная информация
+              errorMessage = 'Ошибка сервера: ' + xhr.responseText.substring(0, 100);
+            }
+          }
+          
+          handleError(errorMessage);
         }
         
       } else {

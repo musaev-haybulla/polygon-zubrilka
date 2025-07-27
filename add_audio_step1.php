@@ -36,22 +36,39 @@ $sortOrder = (int)($_POST['sortOrder'] ?? 1); // Сортировка досту
 $trimAudio = !empty($_POST['trimAudio']);
 
 
-if ($fragmentId <= 0 || empty($audioTitle)) {
-    header('Location: poem_list.php?error=invalid_data');
+// Функция для возврата ошибки в зависимости от типа запроса
+function returnError($errorCode, $message = null) {
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        // Очищаем буфер вывода перед отправкой JSON
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false, 
+            'error' => $message ?: 'Произошла ошибка при обработке запроса'
+        ]);
+        exit;
+    }
+    
+    header("Location: poem_list.php?error=$errorCode");
     exit;
+}
+
+if ($fragmentId <= 0 || empty($audioTitle)) {
+    returnError('invalid_data', 'Некорректные данные формы');
 }
 
 // Дополнительная валидация для режима редактирования
 if ($editMode && $audioId <= 0) {
-    header('Location: poem_list.php?error=invalid_audio_id');
-    exit;
+    returnError('invalid_audio_id', 'Некорректный ID аудиозаписи');
 }
 
 // Проверяем наличие файла (обязательно для добавления, опционально для редактирования)
 $hasNewFile = isset($_FILES['audioFile']) && $_FILES['audioFile']['error'] === UPLOAD_ERR_OK;
 if (!$editMode && !$hasNewFile) {
-    header('Location: poem_list.php?error=file_upload');
-    exit;
+    returnError('file_upload', 'Не удалось загрузить аудиофайл');
 }
 
 try {
@@ -64,8 +81,7 @@ try {
     ");
     $stmt->execute(['fragment_id' => $fragmentId]);
     if (!$stmt->fetch()) {
-        header('Location: poem_list.php?error=fragment_not_found');
-        exit;
+        returnError('fragment_not_found', 'Фрагмент не найден');
     }
 
     // Если режим редактирования, проверяем существование аудиозаписи
@@ -79,8 +95,7 @@ try {
         $existingAudio = $stmt->fetch();
         
         if (!$existingAudio) {
-            header('Location: poem_list.php?error=audio_not_found');
-            exit;
+            returnError('audio_not_found', 'Аудиозапись не найдена');
         }
     }
 
@@ -120,17 +135,18 @@ try {
 
         // Если загружен новый файл, обрабатываем его
         if ($hasNewFile) {
+            // Получаем информацию о текущих файлах
+            $stmt = $pdo->prepare("
+                SELECT filename, original_filename,
+                       (SELECT COUNT(*) FROM audio_timings WHERE audio_track_id = :audio_id) as timings_count
+                FROM audio_tracks 
+                WHERE id = :audio_id
+            ");
+            $stmt->execute(['audio_id' => $audioId]);
+            $currentAudio = $stmt->fetch();
+            
             // Проверяем есть ли обработка (обрезка или разметка) и нет ли подтверждения
             if (!$confirmed) {
-                $stmt = $pdo->prepare("
-                    SELECT filename, original_filename,
-                           (SELECT COUNT(*) FROM audio_timings WHERE audio_track_id = :audio_id) as timings_count
-                    FROM audio_tracks 
-                    WHERE id = :audio_id
-                ");
-                $stmt->execute(['audio_id' => $audioId]);
-                $currentAudio = $stmt->fetch();
-                
                 $hasProcessing = false;
                 $processingTypes = [];
                 
@@ -166,7 +182,17 @@ try {
             
             // Если подтверждена перезапись, удаляем старые файлы и разметку
             if ($confirmed) {
-                AudioFileHelper::deleteAudioFiles($pdo, $audioId);
+                // Удаляем только разметку из БД, физические файлы удалим ниже
+                $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = ?");
+                $stmt->execute([$audioId]);
+                
+                // Удаляем физические файлы (основной и оригинальный)
+                if ($currentAudio['filename']) {
+                    AudioFileHelper::deleteAudioFile($fragmentId, $currentAudio['filename']);
+                }
+                if ($currentAudio['original_filename'] && $currentAudio['original_filename'] !== $currentAudio['filename']) {
+                    AudioFileHelper::deleteAudioFile($fragmentId, $currentAudio['original_filename']);
+                }
             }
             
             if (!move_uploaded_file($_FILES['audioFile']['tmp_name'], $filePath)) {
@@ -240,9 +266,9 @@ try {
         // Вставляем запись в базу данных
         $stmt = $pdo->prepare("
             INSERT INTO audio_tracks 
-            (fragment_id, filename, duration, is_ai_generated, title, sort_order, status, is_default, created_at, updated_at) 
+            (fragment_id, filename, duration, is_ai_generated, title, sort_order, status, created_at, updated_at) 
             VALUES 
-            (:fragment_id, :filename, :duration, :is_ai_generated, :title, :sort_order, :status, :is_default, NOW(), NOW())
+            (:fragment_id, :filename, :duration, :is_ai_generated, :title, :sort_order, :status, NOW(), NOW())
         ");
             
         $insertResult = $stmt->execute([
@@ -252,8 +278,7 @@ try {
             'is_ai_generated' => $voiceType,
             'title' => $audioTitle,
             'sort_order' => $sortOrder,
-            'status' => 'draft', // Всегда draft до завершения разметки
-            'is_default' => 0
+            'status' => 'draft' // Всегда draft до завершения разметки
         ]);
         
         if (!$insertResult) {
@@ -279,6 +304,18 @@ try {
 
     // Определяем куда перенаправлять
     if ($editMode) {
+        // Если это AJAX запрос в режиме редактирования, возвращаем JSON
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            // Очищаем буфер вывода перед отправкой JSON
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => true, 'audio_id' => $audioId]);
+            exit;
+        }
+        
         header('Location: poem_list.php?success=audio_updated');
     } else {
         // Режим добавления  
@@ -312,14 +349,29 @@ try {
         $pdo->rollBack();
     }
     
-    // Удаляем файл если он был загружен
+    // Удаляем временный файл если он был загружен, но произошла ошибка
     if (isset($filePath) && file_exists($filePath)) {
-        // Извлекаем имя файла из полного пути для использования с AudioFileHelper
-        $fileName = basename($filePath);
-        AudioFileHelper::deleteAudioFile($fragmentId, $fileName);
+        unlink($filePath);
     }
     
     error_log("Error in add_audio_step1.php: " . $e->getMessage());
-    header('Location: poem_list.php?error=processing_failed');
+    
+    // Если это AJAX запрос, возвращаем JSON с ошибкой
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        // Очищаем буфер вывода перед отправкой JSON
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false, 
+            'error' => APP_ENV === 'development' ? $e->getMessage() : 'Произошла ошибка при обработке запроса'
+        ]);
+        exit;
+    }
+    
+    // Для обычных HTTP запросов перенаправляем с ошибкой
+    header('Location: poem_list.php?error=processing_error');
     exit;
 }
