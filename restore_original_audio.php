@@ -54,10 +54,7 @@ try {
     }
 
     // Удаляем обрезанный файл
-    $trimmedPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $audioData['filename']);
-    if (file_exists($trimmedPath)) {
-        unlink($trimmedPath);
-    }
+    AudioFileHelper::deleteAudioFile($audioData['fragment_id'], $audioData['filename']);
 
     // Обновляем базу данных - возвращаем на оригинал
     $stmt = $pdo->prepare("
