@@ -184,10 +184,7 @@ try {
 
             // Удаляем старый файл если не была подтверждена перезапись
             if (!$confirmed && $existingAudio['filename']) {
-                $oldFilePath = AudioFileHelper::getAbsoluteAudioPath($fragmentId, $existingAudio['filename']);
-                if (file_exists($oldFilePath)) {
-                    unlink($oldFilePath);
-                }
+                AudioFileHelper::deleteAudioFile($fragmentId, $existingAudio['filename']);
             }
 
             // Обновляем поля файла и сбрасываем workflow
@@ -317,7 +314,9 @@ try {
     
     // Удаляем файл если он был загружен
     if (isset($filePath) && file_exists($filePath)) {
-        unlink($filePath);
+        // Извлекаем имя файла из полного пути для использования с AudioFileHelper
+        $fileName = basename($filePath);
+        AudioFileHelper::deleteAudioFile($fragmentId, $fileName);
     }
     
     error_log("Error in add_audio_step1.php: " . $e->getMessage());
