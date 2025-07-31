@@ -1,6 +1,6 @@
 # Схема базы данных polygon-zubrilka
-# Сгенерировано 2025-06-04 17:39:23
-# Команда: mysql_to_dbdiagram 
+# Обновлено 2025-07-31
+# Актуальная структура БД polygon-zubrilka-test после рефакторинга 
 
 Table authors {
   id           bigint            [pk, increment, not null]
@@ -63,22 +63,22 @@ Table tracks {
   filename             varchar(255)            [not null, note: 'Имя файла в формате title-slug-timestamp.mp3']
   original_filename    varchar(255)            [note: 'Имя оригинального файла до обрезки']
   duration             decimal(8,3)            [not null]
-  is_ai_generated      boolean                 [not null]
+  is_ai_generated      tinyint(1)              [not null]
   title                varchar(255)            [not null]
   sort_order           int                     [not null]
   status               enum('draft', 'active') [not null, default: 'draft']
-  created_at           datetime                [not null]
-  updated_at           datetime                [not null]
+  created_at           timestamp               
+  updated_at           timestamp               
 }
 
 Table timings {
   id        bigint                                   [pk, increment, not null]
   track_id  bigint                                   [not null]
-  line_id   bigint                                   [not null]
+  line_id   bigint                                   [not null]  
   end_time  decimal(8,3)                             [not null]
+  created_at timestamp                               
+  updated_at timestamp                               
   status    enum('in_progress', 'completed')         [not null, default: 'in_progress']
-  created_at datetime                                [not null]
-  updated_at datetime                                [not null]
 }
 
 # Внешние ключи
