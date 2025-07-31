@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Получаем данные аудиозаписи
         $stmt = $pdo->prepare("
             SELECT at.*, f.id as fragment_id
-            FROM audio_tracks at
+            FROM tracks at
             JOIN fragments f ON at.fragment_id = f.id  
             WHERE at.id = ?
         ");
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Обновляем базу данных
         $stmt = $pdo->prepare("
-            UPDATE audio_tracks SET 
+            UPDATE tracks SET 
                 filename = ?,
                 original_filename = ?,
                 duration = ?,
@@ -134,7 +134,7 @@ try {
             f.id as fragment_id,
             p.title as poem_title,
             p.id as poem_id
-        FROM audio_tracks at
+        FROM tracks at
         JOIN fragments f ON at.fragment_id = f.id  
         JOIN poems p ON f.poem_id = p.id
         WHERE at.id = ?

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zubrilka Grok</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    #waveform {
+      width: 100%;
+      border: 1px solid #dee2e6;
+      border-radius: .25rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container py-5" x-data="project">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Zubrilka Grok</h5>
+      </div>
+      <div class="card-body">
+        <div id="waveform"></div>
+
+        <div class="list-group mb-4">
+          <template x-for="(line, index) in lines" :key="index">
+            <label class="list-group-item d-flex gap-3 align-items-center">
+              <input class="form-check-input m-0" type="radio" :name="radioGroup" :value="index" @change="selectLine(index)" :checked="index === selectedIndex" :disabled="lines[index].startTime === null">
+              <span class="flex-grow-1" x-text="line.text"></span>
+              <div class="input-group" style="width: 220px;">
+                <input type="number" class="form-control" step="0.01" x-model.number="lines[index].startTime" @input="validateTime(index, 'start')" :disabled="index === 0" title="Start time">
+                <input type="number" class="form-control" step="0.01" x-model.number="lines[index].endTime" @input="validateTime(index, 'end')" :disabled="index === lines.length - 1" title="End time">
+              </div>
+            </label>
+          </template>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-center gap-2 p-3 mb-3 bg-secondary-subtle border rounded">
+          <button class="btn btn-primary" @click="selectPreviousLine" :disabled="isFirstLine">← Назад</button>
+          <span class="badge text-bg-dark fs-6" x-text="effectiveRegion.startTime"></span>
+          <span class="flex-grow-1 text-center p-2 border rounded bg-white text-truncate" style="min-height: 40px;" x-text="effectiveRegion.text"></span>
+          <span class="badge text-bg-dark fs-6" x-text="effectiveRegion.endTime"></span>
+          <button class="btn btn-primary" @click="selectNextLine" :disabled="isLastLine">Вперед →</button>
+        </div>
+
+        <div class="d-flex justify-content-center flex-wrap gap-2">
+          <button class="btn btn-success" @click="togglePlayPause">
+            <span x-text="isPlaying ? 'Пауза' : 'Плей'"></span>
+          </button>
+          <button class="btn btn-info" @click="saveCurrentRegion">Сохранить</button>
+        </div>
+      </div>
+      <div class="card-footer text-muted text-center">
+        © 2024 Zubrilka Grok
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="https://unpkg.com/wavesurfer.js@7"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('project', () => ({
+        // Константы
+        MIN_DURATION: 0.5,
+        
+        // Данные модели
+        pausesArray: [2.23, 4.62, 6.18, 8.35],
+        lines: [
+          { text: 'Умом Россию не понять', startTime: 0, endTime: null },
+          { text: 'Аршином общим не измерить', startTime: null, endTime: null },
+          { text: 'У ней особенная стать', startTime: null, endTime: null },
+          { text: 'В Россию нужно только верить', startTime: null, endTime: null }
+        ],
+        selectedIndex: 0,
+        radioGroup: 'lines',
+        isPlaying: false,
+        
+        // Добавляем переменную для хранения общей длительности аудио
+        totalDuration: 0,
+        
+        // Wavesurfer компоненты
+        wavesurfer: null,
+        wsRegions: null,
+        currentRegion: null,
+        
+        // Вычисляемое свойство для отображения актуального региона
+        get effectiveRegion() {
+          const line = this.lines[this.selectedIndex];
+          if (!line) return { startTime: 0, text: '', endTime: 0 };
+          if (this.currentRegion) {
+            return {
+              startTime: this.formatTime(this.currentRegion.start),
+              text: line.text,
+              endTime: this.formatTime(this.currentRegion.end)
+            };
+          } else {
+            return {
+              startTime: this.formatTime(line.startTime),
+              text: line.text,
+              endTime: this.formatTime(line.endTime)
+            };
+          }
+        },
+
+        get isFirstLine() {
+          return this.selectedIndex === 0;
+        },
+
+        get isLastLine() {
+          return this.selectedIndex === this.lines.length - 1;
+        },
+
+        // Новое вычисляемое свойство: количество оставшихся строк
+        get remainingLinesCount() {
+          return this.lines.length - this.selectedIndex - 1;
+        },
+
+        // Инициализация
+        init() {
+          this.initWaveSurfer();
+          this.setupWatchers();
+        },
+        
+        // Инициализация WaveSurfer с сохранением длительности аудио
+        initWaveSurfer() {
+          this.wsRegions = WaveSurfer.Regions.create();
+          this.wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            backend: 'WebAudio',
+            plugins: [this.wsRegions]
+          });
+          this.wavesurfer.load('audio.mp3');
+
+          this.wavesurfer.on('ready', () => {
+            // Сохраняем общую длительность аудио при загрузке
+            this.totalDuration = this.wavesurfer.getDuration();
+            console.log('Общая длительность аудио:', this.totalDuration);
+            
+            // Фиксируем конец последней строки на конец аудиофайла
+            const lastIndex = this.lines.length - 1;
+            this.lines[lastIndex].endTime = this.formatTime(this.totalDuration);
+            
+            this.selectLine(0);
+          });
+          
+          this.wavesurfer.on('timeupdate', () => {
+            if (this.currentRegion && this.isPlaying) {
+              const currentTime = this.wavesurfer.getCurrentTime();
+              const { end } = this.currentRegion;
+              if (currentTime >= end) {
+                this.wavesurfer.stop();
+                this.isPlaying = false;
+                this.wavesurfer.setTime(this.currentRegion.start);
+              }
+            }
+          });
+        },
+        
+        // Настройка наблюдателей - без изменений
+        setupWatchers() {
+          this.lines.forEach((_, index) => {
+            this.$watch(`lines[${index}].endTime`, () => {
+              this.updateRegionFromModel(index);
+              this.syncLineTimes(index, 'end');
+            });
+            
+            this.$watch(`lines[${index}].startTime`, () => {
+              this.updateRegionFromModel(index);
+              this.syncLineTimes(index, 'start');
+            });
+          });
+        },
+        
+        // Модифицированная функция получения ограничений с учетом оставшихся строк
+        getLineConstraints(index) {
+          const constraints = {};
+          const isLastLine = index === this.lines.length - 1;
+          
+          // Минимальное начальное время
+          if (index > 0) {
+            const prevLine = this.lines[index - 1];
+            constraints.minStart = prevLine.startTime !== null ? prevLine.startTime + this.MIN_DURATION : 0;
+          } else {
+            constraints.minStart = 0;
+          }
+          
+          // Максимальное начальное время
+          constraints.maxStart = this.lines[index].endTime !== null ?
+            this.lines[index].endTime - this.MIN_DURATION :
+            Infinity;
+          
+          // Минимальное конечное время
+          constraints.minEnd = this.lines[index].startTime !== null ?
+            this.lines[index].startTime + this.MIN_DURATION :
+            0;
+          
+          // Максимальное конечное время с учетом оставшихся строк
+          if (isLastLine) {
+            // Для последней строки конец всегда на конце аудио
+            constraints.maxEnd = this.totalDuration;
+            constraints.minEnd = Math.max(constraints.minEnd, this.totalDuration - this.MIN_DURATION);
+          } else {
+            const remainingLines = this.lines.length - index - 1;
+            const reservedTime = remainingLines * this.MIN_DURATION;
+            
+            // Ограничиваем максимальное конечное время, чтобы оставить место для оставшихся строк
+            constraints.maxEnd = Math.min(
+              this.totalDuration - reservedTime,
+              this.lines[index + 1].endTime !== null ?
+                this.lines[index + 1].endTime - this.MIN_DURATION :
+                Infinity
+            );
+          }
+          
+          return constraints;
+        },
+        
+        // Синхронизация временных значений (без изменений)
+        syncLineTimes(index, type) {
+          if (type === 'end' && index < this.lines.length - 1) {
+            if (this.lines[index].endTime !== null) {
+              this.lines[index + 1].startTime = this.lines[index].endTime;
+            }
+          } else if (type === 'start' && index > 0) {
+            if (this.lines[index].startTime !== null) {
+              this.lines[index - 1].endTime = this.lines[index].startTime;
+            }
+          }
+        },
+        
+        // Обновление времени выбранной строки (без изменений)
+        updateLineTime(index, newStart, newEnd) {
+          this.lines[index].startTime = this.formatTime(newStart);
+          this.lines[index].endTime = this.formatTime(newEnd);
+          this.syncLineTimes(index, 'start');
+          this.syncLineTimes(index, 'end');
+        },
+        
+        // Выбор строки и создание региона
+        selectLine(index) {
+          if (this.lines[index].startTime === null) return;
+          this.selectedIndex = index;
+          this.wsRegions.clearRegions();
+          
+          let { startTime, endTime } = this.lines[index];
+          if (endTime === null) {
+            // Для последней строки используем конец аудио
+            if (index === this.lines.length - 1) {
+              endTime = this.totalDuration;
+            } else {
+              endTime = this.getNextPause(startTime);
+            }
+            
+            this.lines[index].endTime = endTime;
+            
+            if (index < this.lines.length - 1) {
+              this.lines[index + 1].startTime = endTime;
+            }
+          }
+          
+          this.createRegion(index, startTime, endTime);
+          this.wavesurfer.setTime(startTime);
+        },
+        
+        // Создание региона с дополнительными ограничениями
+        createRegion(index, start, end) {
+          // Для последней строки всегда фиксируем конец на конце аудио
+          if (index === this.lines.length - 1) {
+            end = this.totalDuration;
+          }
+          
+          this.currentRegion = this.wsRegions.addRegion({
+            start: start,
+            end: end,
+            color: 'rgba(79, 74, 133, 0.2)',
+            drag: false,
+            resizeStart: !this.isFirstLine,
+            // Для последней строки конец не перемещается
+            resizeEnd: !(this.isLastLine || index === this.lines.length - 1),
+            color: 'rgba(0, 0, 0, 0.02)'
+          });
+
+          this.currentRegion.on('update', () => {
+            let newStart = this.currentRegion.start;
+            let newEnd = this.currentRegion.end;
+            
+            // Проверка минимальной длительности региона
+            if (newEnd - newStart < this.MIN_DURATION) {
+              if (newStart !== this.lines[index].startTime) {
+                newStart = newEnd - this.MIN_DURATION;
+              } else {
+                newEnd = newStart + this.MIN_DURATION;
+              }
+              this.currentRegion.setOptions({ start: newStart, end: newEnd });
+            }
+            
+            // Получаем ограничения с учетом оставшихся строк
+            const constraints = this.getLineConstraints(index);
+            
+            // Применяем ограничения
+            if (newStart < constraints.minStart) {
+              newStart = constraints.minStart;
+              this.currentRegion.setOptions({ start: newStart });
+            }
+            
+            if (newEnd > constraints.maxEnd) {
+              newEnd = constraints.maxEnd;
+              this.currentRegion.setOptions({ end: newEnd });
+            }
+
+            // Для отладки
+            console.log(`Ограничения для строки ${index}:`, {
+              minStart: constraints.minStart,
+              maxStart: constraints.maxStart,
+              minEnd: constraints.minEnd,
+              maxEnd: constraints.maxEnd,
+              currentEnd: newEnd
+            });
+          });
+
+          this.currentRegion.on('update-end', () => {
+            this.updateModelFromRegion(index);
+          });
+        },
+
+        // Оставшиеся методы без изменений
+
+        // Получение следующей паузы
+        getNextPause(startTime) {
+          const nextPause = this.pausesArray.find(pause => pause > startTime);
+          return nextPause ? this.formatTime(nextPause) : this.formatTime(startTime + this.MIN_DURATION);
+        },
+
+        // Форматирование времени
+        formatTime(time) {
+          return parseFloat(Number(time).toFixed(2));
+        },
+        
+        // Универсальная функция валидации времени
+        validateTime(index, type) {
+          const line = this.lines[index];
+          const value = type === 'start' ? line.startTime : line.endTime;
+          
+          // Приводим значение к формату
+          let correctedValue = this.formatTime(value);
+          if (type === 'start' && correctedValue < 0) {
+            correctedValue = 0;
+          }
+          
+          // Применяем ограничения
+          const constraints = this.getLineConstraints(index);
+          const minConstraint = type === 'start' ? constraints.minStart : constraints.minEnd;
+          const maxConstraint = type === 'start' ? constraints.maxStart : constraints.maxEnd;
+          
+          if (correctedValue < minConstraint) {
+            correctedValue = this.formatTime(minConstraint);
+          }
+          if (correctedValue > maxConstraint) {
+            correctedValue = this.formatTime(maxConstraint);
+          }
+          
+          // Обновляем значение в модели
+          if (type === 'start') {
+            line.startTime = correctedValue;
+          } else {
+            line.endTime = correctedValue;
+          }
+          
+          // Синхронизация
+          this.syncLineTimes(index, type);
+
+          if (this.currentRegion && this.selectedIndex === index) {
+            this.updateRegionFromModel(index);
+          }
+          
+          return correctedValue;
+        },
+        
+        // Обновление региона на основе данных модели
+        updateRegionFromModel(index) {
+          if (this.currentRegion && this.selectedIndex === index) {
+            const { startTime, endTime } = this.lines[index];
+            this.currentRegion.setOptions({ start: startTime, end: endTime });
+          }
+        },
+
+        // Обновление модели на основе значений региона
+        updateModelFromRegion(index) {
+          if (this.currentRegion && this.selectedIndex === index) {
+            // Обновляем модель на основе значений региона
+            this.lines[index].startTime = this.formatTime(this.currentRegion.start);
+            this.lines[index].endTime = this.formatTime(this.currentRegion.end);
+            // Синхронизируем соседние строки
+            this.syncLineTimes(index, 'start');
+            this.syncLineTimes(index, 'end');
+          }
+        },
+        
+        // Навигация между строками
+        selectPreviousLine() {
+          let prevIndex = this.selectedIndex - 1;
+          while (prevIndex >= 0 && this.lines[prevIndex].startTime === null) {
+            prevIndex--;
+          }
+          if (prevIndex >= 0) {
+            this.selectLine(prevIndex);
+          }
+        },
+
+        selectNextLine() {
+          let nextIndex = this.selectedIndex + 1;
+          while (nextIndex < this.lines.length && this.lines[nextIndex].startTime === null) {
+            nextIndex++;
+          }
+          if (nextIndex < this.lines.length) {
+            this.selectLine(nextIndex);
+          }
+        },
+
+        // Управление воспроизведением
+        togglePlayPause() {
+          if (this.isPlaying) {
+            this.wavesurfer.pause();
+            this.isPlaying = false;
+          } else {
+            if (this.currentRegion) {
+              const currentTime = this.wavesurfer.getCurrentTime();
+              const { start, end } = this.currentRegion;
+              if (currentTime >= start && currentTime < end) {
+                this.wavesurfer.play();
+              } else {
+                this.wavesurfer.setTime(start);
+                this.wavesurfer.play();
+              }
+              this.isPlaying = true;
+            }
+          }
+        },
+
+        // Сохранение текущего региона
+        saveCurrentRegion() {
+          console.log('Сохранено:', this.lines[this.selectedIndex]);
+        }
+      }));
+    });
+  </script>
+</body>
+</html>

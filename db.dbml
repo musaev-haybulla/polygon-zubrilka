@@ -57,7 +57,7 @@ Table poem_authors {
   author_id  bigint      [pk, not null]
 }
 
-Table audio_tracks {
+Table tracks {
   id                   bigint                  [pk, increment, not null]
   fragment_id          bigint                  [not null]
   filename             varchar(255)            [not null, note: 'Имя файла в формате title-slug-timestamp.mp3']
@@ -71,19 +71,20 @@ Table audio_tracks {
   updated_at           datetime                [not null]
 }
 
-Table audio_timings {
-  id              bigint        [pk, increment, not null]
-  audio_track_id  bigint        [not null]
-  line_id         bigint        [not null]
-  end_time        decimal(8,3)  [not null]
-  created_at      datetime      [not null]
-  updated_at      datetime      [not null]
+Table timings {
+  id        bigint                                   [pk, increment, not null]
+  track_id  bigint                                   [not null]
+  line_id   bigint                                   [not null]
+  end_time  decimal(8,3)                             [not null]
+  status    enum('in_progress', 'completed')         [not null, default: 'in_progress']
+  created_at datetime                                [not null]
+  updated_at datetime                                [not null]
 }
 
 # Внешние ключи
-Ref: audio_tracks.fragment_id > fragments.id [delete: cascade]
-Ref: audio_timings.audio_track_id > audio_tracks.id [delete: cascade]
-Ref: audio_timings.line_id > lines.id [delete: cascade]
+Ref: tracks.fragment_id > fragments.id [delete: cascade]
+Ref: timings.track_id > tracks.id [delete: cascade]
+Ref: timings.line_id > lines.id [delete: cascade]
 Ref: poem_authors.author_id > authors.id [delete: cascade]
 Ref: poem_authors.poem_id > poems.id [delete: cascade]
 Ref: fragments.poem_id > poems.id [delete: cascade]

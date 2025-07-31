@@ -88,7 +88,7 @@ try {
     if ($editMode) {
         $stmt = $pdo->prepare("
             SELECT id, filename 
-            FROM audio_tracks 
+            FROM tracks 
             WHERE id = :audio_id AND fragment_id = :fragment_id
         ");
         $stmt->execute(['audio_id' => $audioId, 'fragment_id' => $fragmentId]);
@@ -106,7 +106,7 @@ try {
         // РЕЖИМ РЕДАКТИРОВАНИЯ
         
         // Получаем текущий sort_order редактируемой озвучки
-        $stmt = $pdo->prepare("SELECT sort_order FROM audio_tracks WHERE id = :audio_id");
+        $stmt = $pdo->prepare("SELECT sort_order FROM tracks WHERE id = :audio_id");
         $stmt->execute(['audio_id' => $audioId]);
         $currentSortOrder = (int)$stmt->fetchColumn();
         
@@ -138,8 +138,8 @@ try {
             // Получаем информацию о текущих файлах
             $stmt = $pdo->prepare("
                 SELECT filename, original_filename,
-                       (SELECT COUNT(*) FROM audio_timings WHERE audio_track_id = :audio_id) as timings_count
-                FROM audio_tracks 
+                       (SELECT COUNT(*) FROM timings WHERE track_id = :audio_id) as timings_count
+                FROM tracks 
                 WHERE id = :audio_id
             ");
             $stmt->execute(['audio_id' => $audioId]);
@@ -183,7 +183,7 @@ try {
             // Если подтверждена перезапись, удаляем старые файлы и разметку
             if ($confirmed) {
                 // Удаляем только разметку из БД, физические файлы удалим ниже
-                $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = ?");
+                $stmt = $pdo->prepare("DELETE FROM timings WHERE track_id = ?");
                 $stmt->execute([$audioId]);
                 
                 // Удаляем физические файлы (основной и оригинальный)
@@ -227,7 +227,7 @@ try {
 
         // Обновляем запись
         $setClause = implode(', ', array_map(fn($field) => "$field = :$field", array_keys($updateFields)));
-        $sql = "UPDATE audio_tracks SET $setClause WHERE id = :audio_id";
+        $sql = "UPDATE tracks SET $setClause WHERE id = :audio_id";
         
         $stmt = $pdo->prepare($sql);
         $result = $stmt->execute($params);
@@ -265,7 +265,7 @@ try {
 
         // Вставляем запись в базу данных
         $stmt = $pdo->prepare("
-            INSERT INTO audio_tracks 
+            INSERT INTO tracks 
             (fragment_id, filename, duration, is_ai_generated, title, sort_order, status, created_at, updated_at) 
             VALUES 
             (:fragment_id, :filename, :duration, :is_ai_generated, :title, :sort_order, :status, NOW(), NOW())
@@ -290,7 +290,7 @@ try {
         
         // Fallback: если lastInsertId не сработал, ищем запись вручную
         if ($audioId === 0) {
-            $stmt2 = $pdo->prepare("SELECT id FROM audio_tracks WHERE fragment_id = ? AND filename = ? ORDER BY id DESC LIMIT 1");
+            $stmt2 = $pdo->prepare("SELECT id FROM tracks WHERE fragment_id = ? AND filename = ? ORDER BY id DESC LIMIT 1");
             $stmt2->execute([$fragmentId, $fileName]);
             $manualResult = $stmt2->fetch();
             $audioId = $manualResult ? (int)$manualResult['id'] : 0;

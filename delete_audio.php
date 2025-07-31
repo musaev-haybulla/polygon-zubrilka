@@ -22,7 +22,7 @@ try {
     $pdo->beginTransaction();
 
     // Находим данные о файлах
-    $stmt = $pdo->prepare("SELECT filename, original_filename, fragment_id FROM audio_tracks WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT filename, original_filename, fragment_id FROM tracks WHERE id = :id");
     $stmt->execute([':id' => $audioId]);
     $audioData = $stmt->fetch();
 
@@ -45,11 +45,11 @@ try {
     }
 
     // 3. Удаляем связанные данные (таймкоды разметки)
-    $stmt = $pdo->prepare("DELETE FROM audio_timings WHERE audio_track_id = :id");
+    $stmt = $pdo->prepare("DELETE FROM timings WHERE track_id = :id");
     $stmt->execute([':id' => $audioId]);
 
     // 4. Выполняем полное удаление записи из БД
-    $stmt = $pdo->prepare("DELETE FROM audio_tracks WHERE id = :id");
+    $stmt = $pdo->prepare("DELETE FROM tracks WHERE id = :id");
     $stmt->execute([':id' => $audioId]);
 
     $pdo->commit();
