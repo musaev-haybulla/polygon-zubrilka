@@ -78,7 +78,6 @@ Table timings {
   end_time  decimal(8,3)                             [not null]
   created_at timestamp                               
   updated_at timestamp                               
-  status    enum('in_progress', 'completed')         [not null, default: 'in_progress']
 }
 
 # Внешние ключи
