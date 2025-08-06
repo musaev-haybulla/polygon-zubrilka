@@ -131,7 +131,7 @@ class FragmentQuery
             "GROUP_CONCAT(DISTINCT at.sort_order ORDER BY at.sort_order SEPARATOR '|') AS audio_sort_orders"
         ]);
         
-        $this->joins[] = 'LEFT JOIN `audio_tracks` at ON f.id = at.fragment_id';
+        $this->joins[] = 'LEFT JOIN `tracks` at ON f.id = at.fragment_id';
         
         if (!in_array('f.id', $this->groupBy)) {
             $this->groupBy[] = 'f.id';
@@ -212,7 +212,7 @@ class FragmentQuery
     private function hasAudioJoin(): bool 
     {
         foreach ($this->joins as $join) {
-            if (strpos($join, 'audio_tracks') !== false) {
+            if (strpos($join, 'tracks') !== false) {
                 return true;
             }
         }

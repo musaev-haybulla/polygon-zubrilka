@@ -1,6 +1,6 @@
 # Схема базы данных polygon-zubrilka
-# Сгенерировано 2025-06-04 17:39:23
-# Команда: mysql_to_dbdiagram 
+# Обновлено 2025-07-31
+# Актуальная структура БД polygon-zubrilka-test после рефакторинга 
 
 Table authors {
   id           bigint            [pk, increment, not null]
@@ -57,33 +57,33 @@ Table poem_authors {
   author_id  bigint      [pk, not null]
 }
 
-Table audio_tracks {
+Table tracks {
   id                   bigint                  [pk, increment, not null]
   fragment_id          bigint                  [not null]
   filename             varchar(255)            [not null, note: 'Имя файла в формате title-slug-timestamp.mp3']
   original_filename    varchar(255)            [note: 'Имя оригинального файла до обрезки']
   duration             decimal(8,3)            [not null]
-  is_ai_generated      boolean                 [not null]
+  is_ai_generated      tinyint(1)              [not null]
   title                varchar(255)            [not null]
   sort_order           int                     [not null]
   status               enum('draft', 'active') [not null, default: 'draft']
-  created_at           datetime                [not null]
-  updated_at           datetime                [not null]
+  created_at           timestamp               
+  updated_at           timestamp               
 }
 
-Table audio_timings {
-  id              bigint        [pk, increment, not null]
-  audio_track_id  bigint        [not null]
-  line_id         bigint        [not null]
-  end_time        decimal(8,3)  [not null]
-  created_at      datetime      [not null]
-  updated_at      datetime      [not null]
+Table timings {
+  id        bigint                                   [pk, increment, not null]
+  track_id  bigint                                   [not null]
+  line_id   bigint                                   [not null]  
+  end_time  decimal(8,3)                             [not null]
+  created_at timestamp                               
+  updated_at timestamp                               
 }
 
 # Внешние ключи
-Ref: audio_tracks.fragment_id > fragments.id [delete: cascade]
-Ref: audio_timings.audio_track_id > audio_tracks.id [delete: cascade]
-Ref: audio_timings.line_id > lines.id [delete: cascade]
+Ref: tracks.fragment_id > fragments.id [delete: cascade]
+Ref: timings.track_id > tracks.id [delete: cascade]
+Ref: timings.line_id > lines.id [delete: cascade]
 Ref: poem_authors.author_id > authors.id [delete: cascade]
 Ref: poem_authors.poem_id > poems.id [delete: cascade]
 Ref: fragments.poem_id > poems.id [delete: cascade]

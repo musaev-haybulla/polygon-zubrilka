@@ -28,7 +28,7 @@ class AudioSorter
             // Получаем все озвучки фрагмента, исключая перемещаемую
             $stmt = $this->pdo->prepare("
                 SELECT id, sort_order 
-                FROM audio_tracks 
+                FROM tracks 
                 WHERE fragment_id = :fragment_id 
                 AND id != :audio_id 
                 ORDER BY sort_order ASC
@@ -74,7 +74,7 @@ class AudioSorter
             // Обновляем sort_order для всех озвучек
             foreach ($newOrder as $item) {
                 $stmt = $this->pdo->prepare("
-                    UPDATE audio_tracks 
+                    UPDATE tracks 
                     SET sort_order = :sort_order, updated_at = NOW() 
                     WHERE id = :audio_id
                 ");
@@ -106,7 +106,7 @@ class AudioSorter
             // Получаем количество существующих озвучек
             $stmt = $this->pdo->prepare("
                 SELECT COUNT(*) 
-                FROM audio_tracks 
+                FROM tracks 
                 WHERE fragment_id = :fragment_id
             ");
             $stmt->execute(['fragment_id' => $fragmentId]);
@@ -125,7 +125,7 @@ class AudioSorter
             // Сдвигаем существующие озвучки
             if ($position <= $count) {
                 $stmt = $this->pdo->prepare("
-                    UPDATE audio_tracks 
+                    UPDATE tracks 
                     SET sort_order = sort_order + 1, updated_at = NOW() 
                     WHERE fragment_id = :fragment_id 
                     AND sort_order >= :position
@@ -157,7 +157,7 @@ class AudioSorter
             // Получаем все озвучки в текущем порядке
             $stmt = $this->pdo->prepare("
                 SELECT id 
-                FROM audio_tracks 
+                FROM tracks 
                 WHERE fragment_id = :fragment_id 
                 ORDER BY sort_order ASC, id ASC
             ");
@@ -167,7 +167,7 @@ class AudioSorter
             // Переиндексируем с 1
             foreach ($audios as $index => $audioId) {
                 $stmt = $this->pdo->prepare("
-                    UPDATE audio_tracks 
+                    UPDATE tracks 
                     SET sort_order = :sort_order, updated_at = NOW() 
                     WHERE id = :audio_id
                 ");

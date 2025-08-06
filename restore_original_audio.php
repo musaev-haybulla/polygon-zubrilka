@@ -26,7 +26,7 @@ try {
     // Получаем данные аудиозаписи
     $stmt = $pdo->prepare("
         SELECT at.*, f.id as fragment_id
-        FROM audio_tracks at
+        FROM tracks at
         JOIN fragments f ON at.fragment_id = f.id  
         WHERE at.id = ?
     ");
@@ -58,7 +58,7 @@ try {
 
     // Обновляем базу данных - возвращаем на оригинал
     $stmt = $pdo->prepare("
-        UPDATE audio_tracks SET 
+        UPDATE tracks SET 
             filename = original_filename,
             original_filename = NULL,
             duration = ?,
