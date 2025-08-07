@@ -641,7 +641,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
   }
   
   // Простая обработка успешного ответа
-  function handleSuccess(audioId) {
+  function handleSuccess(audioId, detected, detectError) {
     progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
     
     // Проверяем нужно ли перейти к обрезке
@@ -656,7 +656,16 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
       }, 500);
     } else {
       progressBar.classList.add('bg-success');
-      progressBar.textContent = 'Загрузка завершена!';
+      if (detected === false) {
+        progressBar.textContent = 'Загрузка завершена (детекция не выполнена)';
+        if (detectError) {
+          alert('Детекция пауз не выполнена: ' + detectError);
+        }
+      } else if (detected === true) {
+        progressBar.textContent = 'Детекция пауз завершена!';
+      } else {
+        progressBar.textContent = 'Загрузка завершена!';
+      }
       
       setTimeout(() => {
         const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
@@ -714,7 +723,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
           // Успешная загрузка
           if (response.success) {
             const audioId = response.audio_id;
-            handleSuccess(audioId);
+            handleSuccess(audioId, response.detected, response.detect_error);
           } else {
             const errorMessage = response.error || 'Неожиданный ответ сервера';
             handleError(errorMessage);
