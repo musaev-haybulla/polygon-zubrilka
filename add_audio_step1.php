@@ -335,13 +335,19 @@ try {
             try {
                 // Полный путь к сохраненному файлу есть в $filePath
                 $detector = new AudioPauseDetector();
-                // Вы можете передать параметр количества строк при необходимости, пока оставляем null
-                $pauseData = $detector->detectPauses($filePath, null);
+                // Определяем число пауз по числу строк стиха (lines), привязанному к fragment_id
+                $stmtCnt = $pdo->prepare("SELECT COUNT(*) FROM lines WHERE fragment_id = :fid");
+                $stmtCnt->execute(['fid' => $fragmentId]);
+                $linesCount = (int)$stmtCnt->fetchColumn();
+                $numLines = max($linesCount - 1, 1);
+                // Передаём num_lines в детектор
+                $pauseData = $detector->detectPauses($filePath, $numLines);
 
-                // Сохраняем JSON в БД
+                // Сохраняем только минимальные данные: массив точек разреза (splits)
                 $stmtPd = $pdo->prepare("UPDATE tracks SET pause_detection = :json WHERE id = :id");
+                $splitsOnly = isset($pauseData['splits']) && is_array($pauseData['splits']) ? $pauseData['splits'] : [];
                 $stmtPd->execute([
-                    'json' => json_encode($pauseData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'json' => json_encode($splitsOnly, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                     'id' => $audioId,
                 ]);
                 $detectedOk = true;
