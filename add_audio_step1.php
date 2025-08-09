@@ -9,6 +9,9 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
 require __DIR__ . '/classes/AudioFileHelper.php';
 
+// Используем детектор пауз
+use App\Audio\AudioPauseDetector;
+
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);
@@ -34,7 +37,6 @@ $audioTitle = trim($_POST['audioTitle'] ?? '');
 $voiceType = (int)($_POST['voiceType'] ?? 0);
 $sortOrder = (int)($_POST['sortOrder'] ?? 1); // Сортировка доступна в обоих режимах
 $trimAudio = !empty($_POST['trimAudio']);
-
 
 // Функция для возврата ошибки в зависимости от типа запроса
 function returnError($errorCode, $message = null) {
@@ -318,11 +320,32 @@ try {
         
         header('Location: poem_list.php?success=audio_updated');
     } else {
-        // Режим добавления  
+        // РЕЖИМ ДОБАВЛЕНИЯ  
         // Переменная $audioId уже содержит корректное значение,
         // полученное внутри блока try-catch.
         
         
+        // Если не требуется обрезка и запрошена детекция пауз, запускаем её синхронно
+        // Это внутренний инструмент — допускаем ожидание ответа на этом шаге
+        if (!$trimAudio && isset($_POST['detect_pauses']) && $_POST['detect_pauses'] === '1') {
+            // Увеличим лимит выполнения на случай длинных файлов
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(180);
+            }
+            try {
+                // Полный путь к сохраненному файлу есть в $filePath
+                $service = new \App\Services\PauseDetectionService();
+                $saved = $service->detectAndSaveSplits($pdo, (int)$audioId, (int)$fragmentId, $filePath, null);
+                $detectedOk = $saved;
+                $detectError = null;
+            } catch (\Throwable $t) {
+                // Не валим процесс загрузки — просто вернем флаг ошибки детекции
+                error_log('Pause detection failed for track #' . $audioId . ': ' . $t->getMessage());
+                $detectedOk = false;
+                $detectError = APP_ENV === 'development' ? $t->getMessage() : 'Ошибка детекции пауз';
+            }
+        }
+
         // Если запрос AJAX, возвращаем JSON с ID
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
             // Очищаем буфер вывода перед отправкой JSON
@@ -331,7 +354,14 @@ try {
             }
             
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['success' => true, 'audio_id' => $audioId]);
+            $response = ['success' => true, 'audio_id' => $audioId];
+            if (isset($detectedOk)) {
+                $response['detected'] = $detectedOk;
+                if (!$detectedOk && isset($detectError)) {
+                    $response['detect_error'] = $detectError;
+                }
+            }
+            echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
         

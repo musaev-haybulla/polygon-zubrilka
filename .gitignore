@@ -8,3 +8,21 @@ tmp/
 
 # Папка для загруженных файлов
 /uploads/
+
+# PHP-зависимости (root vendor)
+/vendor/
+
+# Вендор-папки внутри packages/* (локальные пакеты)
+/packages/**/vendor/
+
+# Python/IDE артефакты внутри packages
+/packages/**/.venv/
+/packages/**/__pycache__/
+/packages/**/*.pyc
+/packages/**/.pytest_cache/
+
+# Общие
+/.env
+/.idea/
+/.vscode/
+*.log

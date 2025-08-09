@@ -9,6 +9,8 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
 require __DIR__ . '/classes/AudioFileHelper.php';
 
+// Используем детектор пауз
+use App\Audio\AudioPauseDetector;
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);
@@ -93,7 +95,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newDuration,
             $audioId
         ]);
-        
+
+        // Синхронная детекция пауз на обрезанном файле (не блокируем успех при ошибке)
+        try {
+            $service = new \App\Services\PauseDetectionService();
+            $service->detectAndSaveSplits($pdo, (int)$audioId, (int)$audioData['fragment_id'], $trimmedPath, (float)$newDuration);
+        } catch (\Throwable $t) {
+            error_log('Pause detection (step2) failed for track #' . $audioId . ': ' . $t->getMessage());
+            // не прерываем процесс
+        }
+
         $pdo->commit();
         
         // Перенаправляем обратно на список с сообщением об успехе
@@ -199,6 +210,8 @@ try {
         .btn-audio {
             min-width: 120px;
         }
+        /* Прелоадер поверх страницы на время обрезки/детекции */
+        #processingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; }
     </style>
 </head>
 <body class="bg-light">
@@ -344,6 +357,15 @@ try {
         </div>
     </div>
 
+    <!-- Прелоадер во время обработки (всегда в DOM) -->
+    <div id="processingOverlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+            <div class="fw-semibold">Обрезаем и определяем паузы…</div>
+            <div class="text-muted small">Пожалуйста, подождите</div>
+        </div>
+    </div>
+
     <!-- Alpine.js, Wavesurfer.js с плагином Regions и Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://unpkg.com/wavesurfer.js@7"></script>
@@ -351,6 +373,17 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Показываем прелоадер при сабмите формы обрезки
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('trimForm');
+            const overlay = document.getElementById('processingOverlay');
+            if (form && overlay) {
+                form.addEventListener('submit', function() {
+                    overlay.style.display = 'flex';
+                });
+            }
+        });
+
         document.addEventListener('alpine:init', () => {
             Alpine.data('audioTrimmer', () => ({
                 wavesurfer: null,

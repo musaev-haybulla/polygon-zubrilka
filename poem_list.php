@@ -604,6 +604,11 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
   
   const form = e.target;
   const formData = new FormData(form);
+  // Если не выбрана обрезка — просим сервер выполнить детекцию пауз синхронно
+  const trimAudioChecked = document.getElementById('trimAudio').checked;
+  if (!trimAudioChecked) {
+    formData.append('detect_pauses', '1');
+  }
   const progressContainer = document.getElementById('uploadProgress');
   const progressBar = document.getElementById('uploadProgressBar');
   const submitBtn = document.getElementById('addAudioSubmitBtn');
@@ -636,7 +641,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
   }
   
   // Простая обработка успешного ответа
-  function handleSuccess(audioId) {
+  function handleSuccess(audioId, detected, detectError) {
     progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
     
     // Проверяем нужно ли перейти к обрезке
@@ -651,7 +656,16 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
       }, 500);
     } else {
       progressBar.classList.add('bg-success');
-      progressBar.textContent = 'Загрузка завершена!';
+      if (detected === false) {
+        progressBar.textContent = 'Загрузка завершена (детекция не выполнена)';
+        if (detectError) {
+          alert('Детекция пауз не выполнена: ' + detectError);
+        }
+      } else if (detected === true) {
+        progressBar.textContent = 'Детекция пауз завершена!';
+      } else {
+        progressBar.textContent = 'Загрузка завершена!';
+      }
       
       setTimeout(() => {
         const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
@@ -670,7 +684,15 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
       if (e.lengthComputable) {
         const percentComplete = Math.round((e.loaded / e.total) * 100);
         progressBar.style.width = percentComplete + '%';
-        progressBar.textContent = percentComplete + '%';
+        // Когда загрузка достигла 100%, если включена синхронная детекция, показываем indeterminate фазу
+        if (percentComplete >= 100 && !trimAudioChecked && formData.get('detect_pauses') === '1') {
+          // Держим полосу на 100%, оставляем анимацию и меняем текст
+          progressBar.textContent = 'Определяем паузы…';
+          const labelEl = document.querySelector('#uploadProgress label.form-label');
+          if (labelEl) labelEl.textContent = 'Обработка файла';
+        } else {
+          progressBar.textContent = percentComplete + '%';
+        }
       }
     });
     
@@ -701,7 +723,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
           // Успешная загрузка
           if (response.success) {
             const audioId = response.audio_id;
-            handleSuccess(audioId);
+            handleSuccess(audioId, response.detected, response.detect_error);
           } else {
             const errorMessage = response.error || 'Неожиданный ответ сервера';
             handleError(errorMessage);
