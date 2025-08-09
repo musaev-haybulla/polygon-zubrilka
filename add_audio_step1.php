@@ -334,23 +334,9 @@ try {
             }
             try {
                 // Полный путь к сохраненному файлу есть в $filePath
-                $detector = new AudioPauseDetector();
-                // Определяем число пауз по числу строк стиха (lines), привязанному к fragment_id
-                $stmtCnt = $pdo->prepare("SELECT COUNT(*) FROM lines WHERE fragment_id = :fid");
-                $stmtCnt->execute(['fid' => $fragmentId]);
-                $linesCount = (int)$stmtCnt->fetchColumn();
-                $numLines = max($linesCount - 1, 1);
-                // Передаём num_lines в детектор
-                $pauseData = $detector->detectPauses($filePath, $numLines);
-
-                // Сохраняем только минимальные данные: массив точек разреза (splits)
-                $stmtPd = $pdo->prepare("UPDATE tracks SET pause_detection = :json WHERE id = :id");
-                $splitsOnly = isset($pauseData['splits']) && is_array($pauseData['splits']) ? $pauseData['splits'] : [];
-                $stmtPd->execute([
-                    'json' => json_encode($splitsOnly, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                    'id' => $audioId,
-                ]);
-                $detectedOk = true;
+                $service = new \App\Services\PauseDetectionService();
+                $saved = $service->detectAndSaveSplits($pdo, (int)$audioId, (int)$fragmentId, $filePath, null);
+                $detectedOk = $saved;
                 $detectError = null;
             } catch (\Throwable $t) {
                 // Не валим процесс загрузки — просто вернем флаг ошибки детекции

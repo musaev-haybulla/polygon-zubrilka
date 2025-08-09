@@ -97,25 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         // Синхронная детекция пауз на обрезанном файле (не блокируем успех при ошибке)
-        if (function_exists('set_time_limit')) {
-            @set_time_limit(180);
-        }
         try {
-            $detector = new AudioPauseDetector();
-            // num_lines = количество строк стиха минус 1
-            $stmtCnt = $pdo->prepare("SELECT COUNT(*) FROM `lines` WHERE fragment_id = :fid");
-            $stmtCnt->execute(['fid' => $audioData['fragment_id']]);
-            $linesCount = (int)$stmtCnt->fetchColumn();
-            $numLines = max($linesCount - 1, 1);
-            $pauseData = $detector->detectPauses($trimmedPath, $numLines);
-
-            // Сохраняем только массив splits
-            $splitsOnly = isset($pauseData['splits']) && is_array($pauseData['splits']) ? $pauseData['splits'] : [];
-            $stmtPd = $pdo->prepare("UPDATE tracks SET pause_detection = :json WHERE id = :id");
-            $stmtPd->execute([
-                'json' => json_encode($splitsOnly, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'id' => $audioId,
-            ]);
+            $service = new \App\Services\PauseDetectionService();
+            $service->detectAndSaveSplits($pdo, (int)$audioId, (int)$audioData['fragment_id'], $trimmedPath, (float)$newDuration);
         } catch (\Throwable $t) {
             error_log('Pause detection (step2) failed for track #' . $audioId . ': ' . $t->getMessage());
             // не прерываем процесс
