@@ -9,6 +9,8 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
 require __DIR__ . '/classes/AudioFileHelper.php';
 
+// Используем детектор пауз
+use App\Audio\AudioPauseDetector;
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);
@@ -93,7 +95,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newDuration,
             $audioId
         ]);
-        
+
+        // Синхронная детекция пауз на обрезанном файле (не блокируем успех при ошибке)
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+        try {
+            $detector = new AudioPauseDetector();
+            // num_lines = количество строк стиха минус 1
+            $stmtCnt = $pdo->prepare("SELECT COUNT(*) FROM `lines` WHERE fragment_id = :fid");
+            $stmtCnt->execute(['fid' => $audioData['fragment_id']]);
+            $linesCount = (int)$stmtCnt->fetchColumn();
+            $numLines = max($linesCount - 1, 1);
+            $pauseData = $detector->detectPauses($trimmedPath, $numLines);
+
+            // Сохраняем только массив splits
+            $splitsOnly = isset($pauseData['splits']) && is_array($pauseData['splits']) ? $pauseData['splits'] : [];
+            $stmtPd = $pdo->prepare("UPDATE tracks SET pause_detection = :json WHERE id = :id");
+            $stmtPd->execute([
+                'json' => json_encode($splitsOnly, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $audioId,
+            ]);
+        } catch (\Throwable $t) {
+            error_log('Pause detection (step2) failed for track #' . $audioId . ': ' . $t->getMessage());
+            // не прерываем процесс
+        }
+
         $pdo->commit();
         
         // Перенаправляем обратно на список с сообщением об успехе
@@ -199,6 +226,8 @@ try {
         .btn-audio {
             min-width: 120px;
         }
+        /* Прелоадер поверх страницы на время обрезки/детекции */
+        #processingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; }
     </style>
 </head>
 <body class="bg-light">
@@ -226,6 +255,15 @@ try {
             <?= htmlspecialchars($error) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
+
+    <!-- Прелоадер во время обработки -->
+    <div id="processingOverlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+            <div class="fw-semibold">Обрезаем и определяем паузы…</div>
+            <div class="text-muted small">Пожалуйста, подождите</div>
+        </div>
+    </div>
         <?php endif; ?>
 
         <div class="card shadow-sm">
@@ -351,6 +389,17 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Показываем прелоадер при сабмите формы обрезки
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('trimForm');
+            const overlay = document.getElementById('processingOverlay');
+            if (form && overlay) {
+                form.addEventListener('submit', function() {
+                    overlay.style.display = 'flex';
+                });
+            }
+        });
+
         document.addEventListener('alpine:init', () => {
             Alpine.data('audioTrimmer', () => ({
                 wavesurfer: null,
