@@ -239,15 +239,6 @@ try {
             <?= htmlspecialchars($error) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-
-    <!-- Прелоадер во время обработки -->
-    <div id="processingOverlay">
-        <div class="text-center">
-            <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
-            <div class="fw-semibold">Обрезаем и определяем паузы…</div>
-            <div class="text-muted small">Пожалуйста, подождите</div>
-        </div>
-    </div>
         <?php endif; ?>
 
         <div class="card shadow-sm">
@@ -363,6 +354,15 @@ try {
             <div class="card-footer text-muted text-center">
                 <small>Выберите нужный фрагмент аудио перетаскиванием границ региона на waveform</small>
             </div>
+        </div>
+    </div>
+
+    <!-- Прелоадер во время обработки (всегда в DOM) -->
+    <div id="processingOverlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+            <div class="fw-semibold">Обрезаем и определяем паузы…</div>
+            <div class="text-muted small">Пожалуйста, подождите</div>
         </div>
     </div>
 
