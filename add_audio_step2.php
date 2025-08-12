@@ -48,7 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Формируем пути к файлам
         $originalFilename = $audioData['filename'];
-        $trimmedFilename = str_replace('.mp3', '-trimmed.mp3', $originalFilename);
+        // Убираем дублирующийся суффикс -trimmed перед добавлением нового
+        $baseForTrim = preg_replace('/-trimmed(?=\.mp3$)/i', '', $originalFilename);
+        $trimmedFilename = preg_replace('/\.mp3$/i', '-trimmed.mp3', $baseForTrim);
         
         $originalPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $originalFilename);
         $trimmedPath = AudioFileHelper::getAbsoluteAudioPath($audioData['fragment_id'], $trimmedFilename);
@@ -99,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Синхронная детекция пауз на обрезанном файле (не блокируем успех при ошибке)
         try {
             $service = new \App\Services\PauseDetectionService();
-            $service->detectAndSaveSplits($pdo, (int)$audioId, (int)$audioData['fragment_id'], $trimmedPath, (float)$newDuration);
+            $service->detectAndSavePauseDetection($pdo, (int)$audioId, (int)$audioData['fragment_id'], $trimmedPath, (float)$newDuration);
         } catch (\Throwable $t) {
             error_log('Pause detection (step2) failed for track #' . $audioId . ': ' . $t->getMessage());
             // не прерываем процесс

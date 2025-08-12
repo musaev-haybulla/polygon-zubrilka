@@ -25,6 +25,14 @@
         <h5 class="mb-0">Разметка аудио</h5>
       </div>
       <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="text-muted">Масштаб</span>
+          <button class="btn btn-sm btn-outline-secondary" @click="zoomOut" title="Уменьшить">−</button>
+          <input type="range" min="20" max="300" step="10" x-model.number="zoom" @input="applyZoom" style="width: 220px;">
+          <button class="btn btn-sm btn-outline-secondary" @click="zoomIn" title="Увеличить">+</button>
+          <button class="btn btn-sm btn-outline-secondary ms-2" @click="fitAll" title="Показать весь трек">Fit All</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="fitRegion" :disabled="!currentRegion" title="По региону">Fit Region</button>
+        </div>
         <div id="waveform"></div>
 
         <div class="d-flex align-items-center justify-content-center gap-2 p-3 mb-3 bg-secondary-subtle border rounded">
@@ -89,6 +97,11 @@
         basePath: '',
 
         // Data
+        ZOOM_MIN: 20,
+        ZOOM_MAX: 300,
+        ZOOM_STEP: 10,
+        zoom: 60,
+        wsReady: false,
         trackId: null,
         pausesArray: [],
         lines: [], // [{ id, text, line_number, startTime, endTime }]
@@ -157,13 +170,17 @@
 
         // Init
         async init() {
+          try {
+            const url = new URL(window.location.href);
+            this.basePath = url.pathname.replace(/add_audio_step3\.php$/, '');
+          } catch (e) {
+            console.error(e);
+          }
           this.trackId = this.getIdFromUrl();
           if (!this.trackId) {
             alert('id отсутствует в URL');
             return;
           }
-          // Compute base path like /polygon-zubrilka/
-          this.basePath = window.location.pathname.replace(/[^\/]+$/, '');
           await this.loadInit();
           this.initWaveSurfer();
           this.setupWatchers();
@@ -231,12 +248,33 @@
         // WaveSurfer
         initWaveSurfer() {
           this.wsRegions = WaveSurfer.Regions.create();
-          this.wavesurfer = WaveSurfer.create({ container: '#waveform', backend: 'WebAudio', plugins: [this.wsRegions] });
+          this.wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#a0c4ff',
+            progressColor: '#4361ee',
+            cursorColor: '#2b2d42',
+            height: 120,
+            normalize: true,
+            plugins: [this.wsRegions],
+          });
+          // initial zoom
+          this.applyZoom();
+
+          // Ctrl/Cmd + колесо мыши для зума
+          const wfEl = document.getElementById('waveform');
+          wfEl.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              if (e.deltaY > 0) this.zoomOut(); else this.zoomIn();
+            }
+          }, { passive: false });
+
           this.wavesurfer.load(this.audioUrl);
 
           this.wavesurfer.on('ready', () => {
-            // duration уже пришёл с сервера и равен this.totalDuration; тут лишь sanity
-            this.selectLine(0);
+            this.wsReady = true;
+            this.totalDuration = this.wavesurfer.getDuration();
+            if (this.lines.length > 0) this.selectLine(0);
           });
 
           this.wavesurfer.on('timeupdate', () => {
@@ -406,12 +444,12 @@
           if (endTime === null) {
             this.currentRegion = null;
             this.wsRegions.clearRegions();
-            this.wavesurfer.setTime(startTime ?? 0);
+            if (this.wsReady) this.wavesurfer.setTime(startTime ?? 0);
             return;
           }
 
           this.createRegion(index, startTime, endTime);
-          this.wavesurfer.setTime(startTime);
+          if (this.wsReady) this.wavesurfer.setTime(startTime);
         },
 
         createRegion(index, start, end) {
@@ -496,12 +534,66 @@
           }
         },
         playCurrentRegionOnce() {
-          if (!this.currentRegion) return;
+          if (!this.wsReady || !this.currentRegion) return;
           const { start, end } = this.currentRegion;
           if (typeof start === 'number' && typeof end === 'number' && end > start) {
-            this.wavesurfer.play(start, end);
-            this.isPlaying = true;
+            try {
+              this.wavesurfer.play(start, end);
+              this.isPlaying = true;
+            } catch (e) {
+              console.warn(e);
+            }
           }
+        },
+        togglePlayPause() {
+          if (!this.wsReady || !this.currentRegion) return;
+          if (this.isPlaying) { this.wavesurfer.pause(); this.isPlaying = false; }
+          else {
+            const { start, end } = this.currentRegion;
+            if (typeof start === 'number' && typeof end === 'number' && end > start) {
+              try {
+                this.wavesurfer.play(start, end);
+                this.isPlaying = true;
+              } catch (e) {
+                console.warn(e);
+              }
+            }
+          }
+        },
+        saveCurrentRegion() { if (!this.isLastLine) this.saveLine(this.selectedIndex).catch(err => this.notifyError(err)); },
+        applyZoom() {
+          const z = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, this.zoom));
+          this.zoom = z;
+          if (this.wavesurfer) {
+            this.wavesurfer.zoom(z);
+          }
+        },
+        zoomIn() {
+          this.zoom = Math.min(this.ZOOM_MAX, this.zoom + this.ZOOM_STEP);
+          this.applyZoom();
+        },
+        zoomOut() {
+          this.zoom = Math.max(this.ZOOM_MIN, this.zoom - this.ZOOM_STEP);
+          this.applyZoom();
+        },
+        fitAll() {
+          const el = document.getElementById('waveform');
+          const w = el ? el.clientWidth : 800;
+          const duration = this.totalDuration || 1;
+          const pxPerSec = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, Math.round(w / duration)));
+          this.zoom = pxPerSec;
+          this.applyZoom();
+        },
+        fitRegion() {
+          if (!this.currentRegion) return;
+          const el = document.getElementById('waveform');
+          const w = el ? el.clientWidth : 800;
+          const dur = Math.max(this.MIN_DURATION, this.currentRegion.end - this.currentRegion.start);
+          const pxPerSec = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, Math.round(w / dur)));
+          this.zoom = pxPerSec;
+          this.applyZoom();
+          // Перейти к началу региона
+          if (this.wsReady) this.wavesurfer.setTime(this.currentRegion.start);
         },
         togglePlayPause() {
           if (!this.currentRegion) return;
