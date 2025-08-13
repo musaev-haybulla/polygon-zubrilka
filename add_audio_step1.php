@@ -335,7 +335,7 @@ try {
             try {
                 // Полный путь к сохраненному файлу есть в $filePath
                 $service = new \App\Services\PauseDetectionService();
-                $saved = $service->detectAndSaveSplits($pdo, (int)$audioId, (int)$fragmentId, $filePath, null);
+                $saved = $service->detectAndSavePauseDetection($pdo, (int)$audioId, (int)$fragmentId, $filePath, null);
                 $detectedOk = $saved;
                 $detectError = null;
             } catch (\Throwable $t) {

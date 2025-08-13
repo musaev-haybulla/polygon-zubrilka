@@ -15,10 +15,10 @@ class PauseDetectionService
     }
 
     /**
-     * Выполнить детекцию пауз и сохранить только splits в tracks.pause_detection
+     * Выполнить детекцию пауз и сохранить результат в tracks.pause_detection
      * Возвращает true при успешной записи (в том числе при пустом массиве, когда пауз нет), false — при исключении в процессе.
      */
-    public function detectAndSaveSplits(PDO $pdo, int $trackId, int $fragmentId, string $audioPath, ?float $durationSec = null): bool
+    public function detectAndSavePauseDetection(PDO $pdo, int $trackId, int $fragmentId, string $audioPath, ?float $durationSec = null): bool
     {
         if (function_exists('set_time_limit')) {
             @set_time_limit(180);
@@ -38,23 +38,23 @@ class PauseDetectionService
             ));
 
             $result = $this->detector->detectPauses($audioPath, $effectiveNumLines);
-            $splits = $result['splits'] ?? [];
+            $pauses = $result['splits'] ?? [];
 
             // fallback: если просили N-1 пауз, а получили пусто, попробуем без ограничения
-            if (empty($splits) && $effectiveNumLines !== null) {
+            if (empty($pauses) && $effectiveNumLines !== null) {
                 error_log(sprintf(
-                    'PauseDetectionService: empty splits with num_lines=%d, retry without limit',
+                    'PauseDetectionService: empty pauses with num_lines=%d, retry without limit',
                     $effectiveNumLines
                 ));
                 $resultRaw = $this->detector->detectPauses($audioPath, null);
                 if (isset($resultRaw['splits']) && is_array($resultRaw['splits'])) {
-                    $splits = $resultRaw['splits'];
+                    $pauses = $resultRaw['splits'];
                 }
             }
 
             $stmt = $pdo->prepare('UPDATE tracks SET pause_detection = :json WHERE id = :id');
             $stmt->execute([
-                'json' => json_encode($splits, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'json' => json_encode($pauses, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 'id' => $trackId,
             ]);
 
