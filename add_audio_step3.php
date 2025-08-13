@@ -256,9 +256,11 @@
             height: 120,
             normalize: true,
             plugins: [this.wsRegions],
+            // Отключаем авто-прокрутку и авто-центрирование, чтобы не дёргалось
+            autoScroll: false,
+            autoCenter: false,
           });
-          // initial zoom
-          this.applyZoom();
+          // zoom будет применён после загрузки (в 'ready')
 
           // Ctrl/Cmd + колесо мыши для зума
           const wfEl = document.getElementById('waveform');
@@ -274,6 +276,8 @@
           this.wavesurfer.on('ready', () => {
             this.wsReady = true;
             this.totalDuration = this.wavesurfer.getDuration();
+            // Применяем стартовый масштаб только когда аудио загружено
+            this.applyZoom();
             if (this.lines.length > 0) this.selectLine(0);
           });
 
@@ -564,7 +568,7 @@
         applyZoom() {
           const z = Math.max(this.ZOOM_MIN, Math.min(this.ZOOM_MAX, this.zoom));
           this.zoom = z;
-          if (this.wavesurfer) {
+          if (this.wavesurfer && this.wsReady) {
             this.wavesurfer.zoom(z);
           }
         },
