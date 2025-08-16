@@ -3,9 +3,10 @@ declare(strict_types=1);
 
 // Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
-require __DIR__ . '/classes/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
-// Настройка отображения ошибок для разработки
+use App\DatabaseHelper;
+use PDOException;// Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);
     error_reporting(E_ALL);

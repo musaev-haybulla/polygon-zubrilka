@@ -4,6 +4,10 @@
  */
 declare(strict_types=1);
 
+namespace App;
+
+use PDO;
+
 class DatabaseHelper 
 {
     private static ?PDO $pdo = null;

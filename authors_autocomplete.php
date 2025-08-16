@@ -6,9 +6,11 @@ declare(strict_types=1);
 
 // Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
-require __DIR__ . '/classes/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
-// Настройка заголовков ответа
+use App\DatabaseHelper;
+use PDOException;use App\ResponseHelper;
+use PDOException;// Настройка заголовков ответа
 ResponseHelper::setApiHeaders();
 
 $q = trim((string)($_GET['q'] ?? ''));

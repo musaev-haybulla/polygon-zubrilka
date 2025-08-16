@@ -3,7 +3,11 @@
  * Помощник для работы с аудиофайлами
  */
 
-class AudioFileHelper 
+
+namespace App;
+
+use PDO;
+use Exception;class AudioFileHelper 
 {
     /**
      * Генерирует slug из названия озвучки

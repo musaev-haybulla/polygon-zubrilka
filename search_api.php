@@ -6,9 +6,11 @@ declare(strict_types=1);
 
 // Подключаем конфигурацию и классы
 require_once __DIR__ . '/config/config.php';
-require_once __DIR__ . '/classes/autoload.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
-// Настройка заголовков
+use App\ResponseHelper;
+use PDOException;use App\SearchService;
+use PDOException;// Настройка заголовков
 ResponseHelper::setApiHeaders();
 ResponseHelper::setCorsHeaders();
 

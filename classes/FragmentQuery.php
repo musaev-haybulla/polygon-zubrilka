@@ -4,6 +4,9 @@
  */
 declare(strict_types=1);
 
+namespace App;
+
+use PDO;
 class FragmentQuery 
 {
     private PDO $pdo;

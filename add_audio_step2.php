@@ -6,8 +6,9 @@ declare(strict_types=1);
 
 // Подключаем конфигурацию и классы
 require __DIR__ . '/config/config.php';
-require __DIR__ . '/classes/autoload.php';
-require __DIR__ . '/classes/AudioFileHelper.php';
+require __DIR__ . '/vendor/autoload.php';
+
+use App\AudioFileHelper;require __DIR__ . '/classes/AudioFileHelper.php';
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
