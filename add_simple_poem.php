@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 // Подключаем конфигурацию
 require __DIR__ . '/config/config.php';
+require __DIR__ . '/vendor/autoload.php';
+
+use App\DatabaseHelper;
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
@@ -10,15 +13,12 @@ if (APP_ENV === 'development') {
     error_reporting(E_ALL);
 }
 
-// Подключаемся к БД
+// Получаем список авторов
 try {
-    $pdo = getPdo();
+    $authors = DatabaseHelper::getAllAuthors();
 } catch (PDOException $e) {
     die("Ошибка подключения к базе данных: " . $e->getMessage());
 }
-$authors = $pdo
-    ->query("SELECT id, CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name FROM authors ORDER BY full_name")
-    ->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="ru">
