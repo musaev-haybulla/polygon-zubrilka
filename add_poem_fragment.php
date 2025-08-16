@@ -45,6 +45,8 @@ $fragments = [];
       <a href="search.html" class="text-blue-600 hover:underline">Поиск</a>
       <span class="mx-2">|</span>
       <a href="add_simple_poem.php" class="text-blue-600 hover:underline">Добавить простой стих</a>
+      <span class="mx-2">|</span>
+      <a href="poem_list.php" class="text-blue-600 hover:underline">Управление озвучками</a>
     </div>
 
     <?php if (!empty($_GET['success'])): ?>

@@ -20,6 +20,17 @@
 </head>
 <body class="bg-light">
   <div class="container py-5" x-data="project()">
+    <!-- Навигационная панель -->
+    <div class="mb-3 p-2 bg-white rounded border">
+      <nav class="small">
+        <a href="search.html" class="text-decoration-none">🔍 Поиск</a>
+        <span class="text-muted mx-2">|</span>
+        <a href="poem_list.php" class="text-decoration-none">🎵 Управление озвучками</a>
+        <span class="text-muted mx-2">|</span>
+        <a href="add_simple_poem.php" class="text-decoration-none">➕ Добавить стих</a>
+      </nav>
+    </div>
+    
     <div class="card">
       <div class="card-header bg-primary text-white">
         <h5 class="mb-0">Разметка аудио</h5>

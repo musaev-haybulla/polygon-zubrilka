@@ -38,6 +38,8 @@ try {
       <a href="search.html" class="text-blue-600 hover:underline">Поиск</a>
       <span class="mx-2">|</span>
       <a href="add_poem_fragment.php" class="text-blue-600 hover:underline">Добавить фрагмент</a>
+      <span class="mx-2">|</span>
+      <a href="poem_list.php" class="text-blue-600 hover:underline">Управление озвучками</a>
     </div>
 
     <?php if (!empty($_GET['success'])): ?>

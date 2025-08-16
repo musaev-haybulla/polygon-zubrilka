@@ -229,7 +229,25 @@ function getPoemSizeClass($size) {
 <body>
 <div class="container py-4" x-data="filterData()">
   <h2 class="fw-bold mb-1">Управление озвучками стихотворений</h2>
-  <p class="text-muted mb-4">Управляйте и организуйте озвучки стихотворений</p>
+  <p class="text-muted mb-3">Управляйте и организуйте озвучки стихотворений</p>
+  
+  <!-- Навигационная панель -->
+  <div class="mb-4 p-3 bg-light rounded">
+    <div class="d-flex flex-wrap gap-2">
+      <a href="search.html" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-search"></i> Поиск
+      </a>
+      <a href="add_simple_poem.php" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-plus-circle"></i> Добавить простой стих
+      </a>
+      <a href="add_poem_fragment.php" class="btn btn-outline-info btn-sm">
+        <i class="bi bi-journal-plus"></i> Добавить фрагмент поэмы
+      </a>
+      <a href="meilisearch.html" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-database"></i> Поисковый индекс
+      </a>
+    </div>
+  </div>
 
   <!-- Фильтры -->
   <div class="filter-section">
