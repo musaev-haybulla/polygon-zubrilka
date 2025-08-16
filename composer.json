@@ -8,7 +8,8 @@
     "require": {
         "php": ">=8.2",
         "meilisearch/meilisearch-php": "^1.15",
-        "php-http/guzzle7-adapter": "^1.1"
+        "php-http/guzzle7-adapter": "^1.1",
+        "robmorgan/phinx": "^0.16.10"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0"
