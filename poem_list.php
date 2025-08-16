@@ -165,8 +165,8 @@ function getPoemSizeClass($size) {
     }
     .voiceover-item {
       border-radius: 6px;
-      padding: 10px 0;
-      margin-bottom: 8px;
+      padding: 0;
+      margin-bottom: 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -203,16 +203,18 @@ function getPoemSizeClass($size) {
     .icon-btn.add-btn:hover {
       background-color: #d1d5db;
     }
-    .badge-gender-female { background-color: #fce4ec; color: #880e4f; }
-    .badge-gender-male { background-color: #e3f2fd; color: #0d47a1; }
-    .badge-voice-live { background-color: #e8f5e9; color: #1b5e20; }
-    .badge-voice-ai { background-color: #f3e5f5; color: #4a148c; }
     
     /* Стили для статусов озвучек */
     .audio-draft-header {
       font-size: 0.85rem;
       color: #6c757d;
       margin: 12px 0 8px 0;
+    }
+    
+    /* Разделитель между активными озвучками и черновиками */
+    .draft-separator {
+      border-top: 1px dashed #dee2e6;
+      margin: 8px 0;
     }
     
     /* Анимация загрузки */
@@ -317,41 +319,25 @@ function getPoemSizeClass($size) {
           
           <template x-if="audios.length > 0">
             <div>
-              <!-- Активные озвучки -->
-              <template x-for="audio in activeAudios" :key="audio.id">
-                <div class="voiceover-item">
-                  <div>
-                    <strong class="d-block" x-text="audio.title"></strong>
-                    <div>
-                      <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
+              <template x-for="(audio, index) in sortedAudios" :key="audio.id">
+                <div>
+                  <!-- Пунктир перед первым черновиком -->
+                  <template x-if="index > 0 && audio.status === 'draft' && sortedAudios[index-1].status === 'active'">
+                    <div class="draft-separator"></div>
+                  </template>
+                  
+                  <!-- Озвучка -->
+                  <div class="voiceover-item">
+                    <div class="d-flex align-items-center gap-2">
+                      <strong x-text="audio.title"></strong>
+                      <i :class="audio.is_ai ? 'bi bi-robot text-primary' : 'bi bi-person-fill text-success'" :title="audio.is_ai ? 'ИИ голос' : 'Живой голос'"></i>
                     </div>
-                  </div>
-                  <div>
-                    <button class="icon-btn" title="Редактировать"><i class="bi bi-pencil"></i></button>
-                    <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
-                  </div>
-                </div>
-              </template>
-              
-              <!-- Заголовок черновиков -->
-              <template x-if="draftAudios.length > 0">
-                <div class="audio-draft-header">Черновики</div>
-              </template>
-              
-              <!-- Черновики -->
-              <template x-for="audio in draftAudios" :key="audio.id">
-                <div class="voiceover-item">
-                  <div>
-                    <strong class="d-block" x-text="audio.title"></strong>
-                    <div>
-                      <span class="badge rounded-pill" :class="audio.is_ai ? 'badge-voice-ai' : 'badge-voice-live'" x-text="audio.is_ai ? 'ИИ' : 'Живой голос'"></span>
+                    <div style="flex-shrink: 0;">
+                      <button class="icon-btn" @click="editAudio(audio)" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
+                      <a :href="'add_audio_step2.php?id=' + audio.id" class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></a>
+                      <a :href="'add_audio_step3.php?id=' + audio.id" class="icon-btn" title="Перейти к разметке"><i class="bi bi-play-circle"></i></a>
+                      <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
                     </div>
-                  </div>
-                  <div>
-                    <button class="icon-btn" @click="editAudio(audio)" title="Редактировать метаинформацию"><i class="bi bi-pencil"></i></button>
-                    <a :href="'add_audio_step2.php?id=' + audio.id" class="icon-btn" title="Обрезать аудиофайл"><i class="bi bi-scissors"></i></a>
-                    <button class="icon-btn" title="Перейти к разметке"><i class="bi bi-play-circle"></i></button>
-                    <button class="icon-btn" @click="deleteAudio(audio.id)" title="Удалить"><i class="bi bi-trash"></i></button>
                   </div>
                 </div>
               </template>
@@ -454,12 +440,22 @@ function poemCard(poemData) {
     audios: poemData.audios,
     expanded: false,
     
-    get draftAudios() {
-      return this.audios.filter(audio => audio.status === 'draft');
+    get activeAudios() {
+      return this.sortedAudios.filter(audio => audio.status === 'active');
     },
     
-    get activeAudios() {
-      return this.audios.filter(audio => audio.status === 'active');
+    get draftAudios() {
+      return this.sortedAudios.filter(audio => audio.status === 'draft');
+    },
+    
+    get sortedAudios() {
+      // Активные озвучки сначала, потом черновики, в рамках каждой группы по sort_order
+      return [...this.audios].sort((a, b) => {
+        if (a.status !== b.status) {
+          return a.status === 'active' ? -1 : 1; // active идут первыми
+        }
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      });
     },
     
     editAudio(audio) {
@@ -604,11 +600,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
   
   const form = e.target;
   const formData = new FormData(form);
-  // Если не выбрана обрезка — просим сервер выполнить детекцию пауз синхронно
   const trimAudioChecked = document.getElementById('trimAudio').checked;
-  if (!trimAudioChecked) {
-    formData.append('detect_pauses', '1');
-  }
   const progressContainer = document.getElementById('uploadProgress');
   const progressBar = document.getElementById('uploadProgressBar');
   const submitBtn = document.getElementById('addAudioSubmitBtn');
@@ -670,7 +662,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
       setTimeout(() => {
         const modal = bootstrap.Modal.getInstance(document.getElementById('addAudioModal'));
         modal.hide();
-        window.location.reload();
+        window.location.href = `add_audio_step3.php?id=${audioId}`;
       }, 1000);
     }
   }
@@ -684,15 +676,7 @@ document.getElementById('addAudioForm').addEventListener('submit', function(e) {
       if (e.lengthComputable) {
         const percentComplete = Math.round((e.loaded / e.total) * 100);
         progressBar.style.width = percentComplete + '%';
-        // Когда загрузка достигла 100%, если включена синхронная детекция, показываем indeterminate фазу
-        if (percentComplete >= 100 && !trimAudioChecked && formData.get('detect_pauses') === '1') {
-          // Держим полосу на 100%, оставляем анимацию и меняем текст
-          progressBar.textContent = 'Определяем паузы…';
-          const labelEl = document.querySelector('#uploadProgress label.form-label');
-          if (labelEl) labelEl.textContent = 'Обработка файла';
-        } else {
-          progressBar.textContent = percentComplete + '%';
-        }
+        progressBar.textContent = percentComplete + '%';
       }
     });
     

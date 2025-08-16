@@ -124,11 +124,11 @@ class FragmentQuery
     {
         $this->select = array_merge($this->select, [
             'COUNT(DISTINCT at.id) AS audio_count',
-            "GROUP_CONCAT(DISTINCT at.id ORDER BY at.sort_order SEPARATOR '|') AS audio_ids",
-            "GROUP_CONCAT(DISTINCT at.title ORDER BY at.sort_order SEPARATOR '|') AS audio_titles",
-            "GROUP_CONCAT(DISTINCT at.is_ai_generated ORDER BY at.sort_order SEPARATOR '|') AS audio_types",
-            "GROUP_CONCAT(DISTINCT at.status ORDER BY at.sort_order SEPARATOR '|') AS audio_statuses",
-            "GROUP_CONCAT(DISTINCT at.sort_order ORDER BY at.sort_order SEPARATOR '|') AS audio_sort_orders"
+            "(SELECT GROUP_CONCAT(t.id ORDER BY t.sort_order SEPARATOR '|') FROM tracks t WHERE t.fragment_id = f.id) AS audio_ids",
+            "(SELECT GROUP_CONCAT(t.title ORDER BY t.sort_order SEPARATOR '|') FROM tracks t WHERE t.fragment_id = f.id) AS audio_titles",
+            "(SELECT GROUP_CONCAT(t.is_ai_generated ORDER BY t.sort_order SEPARATOR '|') FROM tracks t WHERE t.fragment_id = f.id) AS audio_types",
+            "(SELECT GROUP_CONCAT(t.status ORDER BY t.sort_order SEPARATOR '|') FROM tracks t WHERE t.fragment_id = f.id) AS audio_statuses",
+            "(SELECT GROUP_CONCAT(t.sort_order ORDER BY t.sort_order SEPARATOR '|') FROM tracks t WHERE t.fragment_id = f.id) AS audio_sort_orders"
         ]);
         
         $this->joins[] = 'LEFT JOIN `tracks` at ON f.id = at.fragment_id';

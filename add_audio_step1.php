@@ -9,8 +9,6 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
 require __DIR__ . '/classes/AudioFileHelper.php';
 
-// Используем детектор пауз
-use App\Audio\AudioPauseDetector;
 
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
@@ -204,7 +202,8 @@ try {
             // Получаем длительность файла
             $duration = 0;
             if (function_exists('shell_exec')) {
-                $output = shell_exec("ffprobe -i '$filePath' -show_entries format=duration -v quiet -of csv=\"p=0\"");
+                $cmd = sprintf("%s -i '%s' -show_entries format=duration -v quiet -of csv=\"p=0\"", AudioFileHelper::getFFprobePath(), $filePath);
+            $output = shell_exec($cmd);
                 if ($output !== null) {
                     $duration = floatval(trim($output));
                 }
@@ -325,26 +324,6 @@ try {
         // полученное внутри блока try-catch.
         
         
-        // Если не требуется обрезка и запрошена детекция пауз, запускаем её синхронно
-        // Это внутренний инструмент — допускаем ожидание ответа на этом шаге
-        if (!$trimAudio && isset($_POST['detect_pauses']) && $_POST['detect_pauses'] === '1') {
-            // Увеличим лимит выполнения на случай длинных файлов
-            if (function_exists('set_time_limit')) {
-                @set_time_limit(180);
-            }
-            try {
-                // Полный путь к сохраненному файлу есть в $filePath
-                $service = new \App\Services\PauseDetectionService();
-                $saved = $service->detectAndSavePauseDetection($pdo, (int)$audioId, (int)$fragmentId, $filePath, null);
-                $detectedOk = $saved;
-                $detectError = null;
-            } catch (\Throwable $t) {
-                // Не валим процесс загрузки — просто вернем флаг ошибки детекции
-                error_log('Pause detection failed for track #' . $audioId . ': ' . $t->getMessage());
-                $detectedOk = false;
-                $detectError = APP_ENV === 'development' ? $t->getMessage() : 'Ошибка детекции пауз';
-            }
-        }
 
         // Если запрос AJAX, возвращаем JSON с ID
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
@@ -369,7 +348,7 @@ try {
         if ($trimAudio) {
             header("Location: add_audio_step2.php?id=$audioId");
         } else {
-            header('Location: poem_list.php?success=audio_added');
+            header("Location: add_audio_step3.php?id=$audioId");
         }
     }
     exit;

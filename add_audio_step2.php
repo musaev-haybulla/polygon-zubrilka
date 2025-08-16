@@ -9,8 +9,6 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/classes/autoload.php';
 require __DIR__ . '/classes/AudioFileHelper.php';
 
-// Используем детектор пауз
-use App\Audio\AudioPauseDetector;
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);
@@ -98,14 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $audioId
         ]);
 
-        // Синхронная детекция пауз на обрезанном файле (не блокируем успех при ошибке)
-        try {
-            $service = new \App\Services\PauseDetectionService();
-            $service->detectAndSavePauseDetection($pdo, (int)$audioId, (int)$audioData['fragment_id'], $trimmedPath, (float)$newDuration);
-        } catch (\Throwable $t) {
-            error_log('Pause detection (step2) failed for track #' . $audioId . ': ' . $t->getMessage());
-            // не прерываем процесс
-        }
 
         $pdo->commit();
         

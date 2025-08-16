@@ -63,7 +63,6 @@ Table tracks {
   filename             varchar(255)            [not null, note: 'Имя файла в формате title-slug-timestamp.mp3']
   original_filename    varchar(255)            [note: 'Имя оригинального файла до обрезки']
   duration             decimal(8,3)            [not null]
-  pause_detection      json
   is_ai_generated      tinyint(1)              [not null]
   title                varchar(255)            [not null]
   sort_order           int                     [not null]

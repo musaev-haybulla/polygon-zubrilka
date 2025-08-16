@@ -1,8 +1,9 @@
-data.sql
-backup.sql
 search_log.txt
 poem_import.log
 .DS_Store
+
+docker-compose.yml
+docker/
 
 tmp/
 
@@ -11,15 +12,6 @@ tmp/
 
 # PHP-зависимости (root vendor)
 /vendor/
-
-# Вендор-папки внутри packages/* (локальные пакеты)
-/packages/**/vendor/
-
-# Python/IDE артефакты внутри packages
-/packages/**/.venv/
-/packages/**/__pycache__/
-/packages/**/*.pyc
-/packages/**/.pytest_cache/
 
 # Общие
 /.env

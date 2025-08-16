@@ -20,7 +20,7 @@ class TimingService
 
     /**
      * Вернуть данные для инициализации разметки таймингов.
-     * @return array{audioUrl:string,totalDuration:float,lines:array<int,array{id:int,text:string,line_number:int}>,timings:array<int,float>,pause_detection:array|null}
+     * @return array{audioUrl:string,totalDuration:float,lines:array<int,array{id:int,text:string,line_number:int}>,timings:array<int,float>}
      */
     public function getInitData(PDO $pdo, int $trackId): array
     {
@@ -58,19 +58,6 @@ class TimingService
             $timings[$lastLineId] = $duration;
         }
 
-        // Pause detection: pass-through original JSON
-        $pauseDetection = null;
-        if (!empty($track['id'])) {
-            $stmt = $pdo->prepare('SELECT pause_detection FROM tracks WHERE id = ?');
-            $stmt->execute([$trackId]);
-            $pd = $stmt->fetchColumn();
-            if ($pd) {
-                $json = json_decode((string)$pd, true);
-                if (is_array($json)) {
-                    $pauseDetection = $json; // pass through as-is
-                }
-            }
-        }
 
         // Build audio URL: uploads/audio/{fragmentId}/{filename}
         $audioUrl = $this->buildAudioUrl((int)$track['fragment_id'], (string)$track['filename']);
@@ -89,7 +76,6 @@ class TimingService
             'totalDuration' => $duration,
             'lines' => $normLines,
             'timings' => $timings,
-            'pause_detection' => $pauseDetection,
         ];
     }
 

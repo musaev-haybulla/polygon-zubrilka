@@ -252,8 +252,6 @@
             // Для последней строки используем конец аудио
             if (index === this.lines.length - 1) {
               endTime = this.totalDuration;
-            } else {
-              endTime = this.getNextPause(startTime);
             }
             
             this.lines[index].endTime = endTime;
@@ -330,11 +328,6 @@
 
         // Оставшиеся методы без изменений
 
-        // Получение следующей паузы
-        getNextPause(startTime) {
-          const nextPause = this.pausesArray.find(pause => pause > startTime);
-          return nextPause ? this.formatTime(nextPause) : this.formatTime(startTime + this.MIN_DURATION);
-        },
 
         // Форматирование времени
         formatTime(time) {

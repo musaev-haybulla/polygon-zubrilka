@@ -2,10 +2,10 @@
 declare(strict_types=1);
 
 // Database configuration
-const DB_HOST    = '127.0.0.1';
-const DB_NAME    = 'polygon-zubrilka-test';
-const DB_USER    = 'root';
-const DB_PASS    = 'root';
+const DB_HOST    = 'db';
+const DB_NAME    = 'app';
+const DB_USER    = 'app';
+const DB_PASS    = 'secret';
 const DB_CHARSET = 'utf8mb4';
 
 // PDO options

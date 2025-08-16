@@ -103,7 +103,6 @@
         zoom: 60,
         wsReady: false,
         trackId: null,
-        pausesArray: [],
         lines: [], // [{ id, text, line_number, startTime, endTime }]
         selectedIndex: 0,
         radioGroup: 'lines',
@@ -134,23 +133,6 @@
           };
         },
 
-        // Normalize pause hints from backend: use pause_detection only
-        extractPauses(payload) {
-          try {
-            if (!payload || typeof payload !== 'object') return [];
-            const pd = payload.pause_detection;
-            let cand = null;
-            if (pd) {
-              if (Array.isArray(pd)) cand = pd; // pause_detection as array
-              else if (typeof pd === 'object') {
-                if (Array.isArray(pd.splits)) cand = pd.splits;
-                else if (Array.isArray(pd.pauses)) cand = pd.pauses;
-                else if (Array.isArray(pd.breaks)) cand = pd.breaks;
-              }
-            }
-            return Array.isArray(cand) ? cand.map(parseFloat).filter(n => Number.isFinite(n)) : [];
-          } catch (_) { return []; }
-        },
         get isFirstLine() { return this.selectedIndex === 0; },
         get isLastLine() { return this.selectedIndex === this.lines.length - 1; },
         get remainingLinesCount() { return this.lines.length - this.selectedIndex - 1; },
@@ -199,7 +181,6 @@
           const data = json.data;
           this.audioUrl = data.audioUrl;
           this.totalDuration = parseFloat(data.totalDuration);
-          this.pausesArray = this.extractPauses(data);
 
           // Build lines with start/end from timings
           const timings = data.timings || {}; // map line_id -> end
@@ -222,23 +203,22 @@
               const prev = this.lines[i-1];
               this.lines[i].startTime = prev.endTime !== null ? prev.endTime : null;
             }
-            // If no endTime and not last — hint from pauses
-            if (this.lines[i].endTime === null && i < this.lines.length - 1) {
-              const hint = this.getNextPause(this.lines[i].startTime ?? 0);
-              this.lines[i].endTime = hint;
-            }
+            // If no endTime and not last — use default logic (will be handled in selectLine)
             // Ensure last line end equals totalDuration (domain rule already applied, but be safe)
             if (i === this.lines.length - 1) {
               this.lines[i].endTime = this.formatTime(this.totalDuration);
             }
           }
 
-          // If there is no pause_detection, prefill only the first line with a small default window
-          if ((!Array.isArray(this.pausesArray) || this.pausesArray.length === 0) && this.lines.length > 0) {
+          // Prefill only the first line with a small default window
+          if (this.lines.length > 0) {
             const first = this.lines[0];
+            // First line should always start at 0
+            first.startTime = 0;
             if (first.endTime === null) {
-              const start0 = typeof first.startTime === 'number' ? first.startTime : 0;
-              const proposed = this.formatTime(Math.min(this.totalDuration, start0 + this.MIN_DURATION * 5));
+              // Use fallback window even if totalDuration is 0 or unknown
+              const fallbackEnd = this.MIN_DURATION * this.FIRST_WINDOW_FACTOR;
+              const proposed = this.formatTime(this.totalDuration > 0 ? Math.min(this.totalDuration, fallbackEnd) : fallbackEnd);
               first.endTime = proposed;
               if (this.lines.length > 1) this.lines[1].startTime = proposed;
             }
@@ -282,7 +262,7 @@
           });
 
           this.wavesurfer.on('timeupdate', () => {
-            if (this.currentRegion && this.isPlaying) {
+            if (this.currentRegion && this.isPlaying && this.currentRegion.start !== undefined && this.currentRegion.end !== undefined) {
               const currentTime = this.wavesurfer.getCurrentTime();
               const { end } = this.currentRegion;
               if (currentTime >= end) {
@@ -488,10 +468,9 @@
 
         // Utils
         getNextPause(startTime) {
-          if (!Array.isArray(this.pausesArray) || this.pausesArray.length === 0) return null;
-          const st = typeof startTime === 'number' ? startTime : 0;
-          const nextPause = this.pausesArray.find(pause => pause > st);
-          return nextPause ? this.formatTime(nextPause) : null;
+          // Since pause detection is removed, return null
+          // This will trigger fallback logic in selectLine
+          return null;
         },
         formatTime(time) { return parseFloat(Number(time).toFixed(2)); },
 
@@ -598,11 +577,6 @@
           this.applyZoom();
           // Перейти к началу региона
           if (this.wsReady) this.wavesurfer.setTime(this.currentRegion.start);
-        },
-        togglePlayPause() {
-          if (!this.currentRegion) return;
-          if (this.isPlaying) { this.wavesurfer.pause(); this.isPlaying = false; }
-          else { this.wavesurfer.play(this.currentRegion.start, this.currentRegion.end); this.isPlaying = true; }
         },
         saveCurrentRegion() { if (!this.isLastLine) this.saveLine(this.selectedIndex).catch(err => this.notifyError(err)); },
       };
