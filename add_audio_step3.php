@@ -45,7 +45,7 @@
 
         <div class="d-flex justify-content-center flex-wrap gap-2">
           <button class="btn btn-success" @click="togglePlayPause">
-            <span x-text="isPlaying ? 'Пауза' : 'Плей'"></span>
+            <span x-text="isPlaying ? 'Пауза' : 'Воспроизвести'"></span>
           </button>
           <button class="btn btn-warning" @click="saveCurrentRegion" :disabled="isLastLine">Фиксация черновика</button>
           <button class="btn btn-primary" @click="finalizeTimings" :disabled="!isAllComplete">Сохранить озвучку</button>
@@ -399,18 +399,12 @@
 
           let { startTime, endTime } = this.lines[index];
           if (endTime === null) {
-            let defaultEnd = null;
+            // Для последней строки конец равен длительности трека,
+            // для остальных — сразу применяем фоллбэк‑окно без попыток детекции пауз
             if (index === this.lines.length - 1) {
-              defaultEnd = this.totalDuration;
-            } else {
-              defaultEnd = this.getNextPause(startTime);
-            }
-            if (defaultEnd !== null) {
-              endTime = defaultEnd;
+              endTime = this.totalDuration;
               this.lines[index].endTime = endTime;
-              if (index < this.lines.length - 1) this.lines[index + 1].startTime = endTime;
-            } else if (index < this.lines.length - 1 && typeof startTime === 'number') {
-              // No hints: propose a small default window using FIRST_WINDOW_FACTOR
+            } else if (typeof startTime === 'number') {
               const constraints = this.getLineConstraints(index);
               const proposed = this.formatTime(
                 Math.min(
@@ -467,11 +461,6 @@
         },
 
         // Utils
-        getNextPause(startTime) {
-          // Since pause detection is removed, return null
-          // This will trigger fallback logic in selectLine
-          return null;
-        },
         formatTime(time) { return parseFloat(Number(time).toFixed(2)); },
 
         validateTime(index, type) {
@@ -578,7 +567,7 @@
           // Перейти к началу региона
           if (this.wsReady) this.wavesurfer.setTime(this.currentRegion.start);
         },
-        saveCurrentRegion() { if (!this.isLastLine) this.saveLine(this.selectedIndex).catch(err => this.notifyError(err)); },
+        
       };
     }
 
