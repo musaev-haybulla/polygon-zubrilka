@@ -8,8 +8,9 @@ declare(strict_types=1);
 require __DIR__ . '/config/config.php';
 require __DIR__ . '/vendor/autoload.php';
 
-use App\FragmentQuery;require __DIR__ . '/config/poem_size_config.php';
-use PDOException;
+use App\FragmentQuery;
+
+require __DIR__ . '/config/poem_size_config.php';
 // Настройка отображения ошибок для разработки
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);

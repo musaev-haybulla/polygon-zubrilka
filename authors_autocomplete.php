@@ -9,8 +9,9 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/vendor/autoload.php';
 
 use App\DatabaseHelper;
-use PDOException;use App\ResponseHelper;
-use PDOException;// Настройка заголовков ответа
+use App\ResponseHelper;
+
+// Настройка заголовков ответа
 ResponseHelper::setApiHeaders();
 
 $q = trim((string)($_GET['q'] ?? ''));

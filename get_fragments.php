@@ -10,7 +10,6 @@ require __DIR__ . '/vendor/autoload.php';
 
 use App\ResponseHelper;
 use App\DatabaseHelper;
-use PDOException;
 // Настройка заголовков ответа
 ResponseHelper::setApiHeaders();
 

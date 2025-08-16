@@ -9,8 +9,9 @@ require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 use App\ResponseHelper;
-use PDOException;use App\SearchService;
-use PDOException;// Настройка заголовков
+use App\SearchService;
+
+// Настройка заголовков
 ResponseHelper::setApiHeaders();
 ResponseHelper::setCorsHeaders();
 
