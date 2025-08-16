@@ -9,6 +9,8 @@ header('Content-Type: application/json; charset=utf-8');
 require __DIR__ . '/config/config.php';
 require __DIR__ . '/vendor/autoload.php';
 
+use App\AudioFileHelper;
+
 
 // Получаем данные из запроса
 $input = json_decode(file_get_contents('php://input'), true);
