@@ -326,9 +326,30 @@
     </div>
 
     <script>
-        const MEILISEARCH_HOST = 'https://testing.local:7701';
-        const MEILISEARCH_KEY = 'SqNO0v-eMRxckMZnpcFla3fgEpiH5UQR9PGY-z2tLNg';
-        const INDEX_NAME = 'content';
+        // Конфигурация загружается из config_api.php
+        let CONFIG = null;
+        let MEILISEARCH_HOST = '';
+        let MEILISEARCH_KEY = '';
+        let INDEX_NAME = '';
+        
+        // Загружаем конфигурацию при инициализации
+        async function loadConfig() {
+            try {
+                const response = await fetch('config_api.php');
+                if (!response.ok) throw new Error('Не удалось загрузить конфигурацию');
+                
+                CONFIG = await response.json();
+                MEILISEARCH_HOST = CONFIG.meilisearch.host;
+                MEILISEARCH_KEY = CONFIG.meilisearch.key;
+                INDEX_NAME = CONFIG.meilisearch.index;
+                
+                return true;
+            } catch (error) {
+                console.error('Ошибка загрузки конфигурации:', error);
+                showError('Ошибка загрузки конфигурации: ' + error.message);
+                return false;
+            }
+        }
         
         // Проверяем протокол и показываем предупреждение
         if (window.location.protocol === 'https:') {
@@ -342,7 +363,13 @@
         let currentSuggestions = [];
         
         // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Сначала загружаем конфигурацию
+            const configLoaded = await loadConfig();
+            if (!configLoaded) {
+                return; // Ошибка уже показана в loadConfig
+            }
+            
             const searchInput = document.getElementById('searchInput');
             const suggestionsContainer = document.getElementById('suggestionsContainer');
             
@@ -415,17 +442,23 @@
         }
         
         async function fetchSuggestions(query) {
-            if (!query || query.length < 2) return;
+            if (!query || query.length < 2 || !CONFIG) return;
             
             try {
                 const searchUrl = `${MEILISEARCH_HOST}/indexes/${INDEX_NAME}/search`;
                 
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // Добавляем Authorization только если есть ключ
+                if (MEILISEARCH_KEY && MEILISEARCH_KEY.trim() !== '') {
+                    headers['Authorization'] = `Bearer ${MEILISEARCH_KEY}`;
+                }
+                
                 const response = await fetch(searchUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${MEILISEARCH_KEY}`
-                    },
+                    headers: headers,
                     body: JSON.stringify({
                         q: query,
                         attributesToHighlight: ['name', 'title', 'author_name', 'first_line', 'full_text'],
@@ -605,7 +638,7 @@
                 query = document.getElementById('searchInput').value.trim();
             }
             
-            if (!query) return;
+            if (!query || !CONFIG) return;
             
             hideSuggestions(); // Скрываем suggestions при полном поиске
             showLoading();
@@ -613,12 +646,18 @@
             try {
                 const searchUrl = `${MEILISEARCH_HOST}/indexes/${INDEX_NAME}/search`;
                 
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // Добавляем Authorization только если есть ключ
+                if (MEILISEARCH_KEY && MEILISEARCH_KEY.trim() !== '') {
+                    headers['Authorization'] = `Bearer ${MEILISEARCH_KEY}`;
+                }
+                
                 const response = await fetch(searchUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${MEILISEARCH_KEY}`
-                    },
+                    headers: headers,
                     body: JSON.stringify({
                         q: query,
                         attributesToHighlight: ['*'],

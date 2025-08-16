@@ -6,21 +6,20 @@
 
 declare(strict_types=1);
 
-// Подключаем конфигурацию
+// Подключаем конфигурацию и автозагрузчик
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
-// Конфигурация Meilisearch
-$meilisearchConfig = [
-    'host'  => MEILISEARCH_HOST,
-    'key'   => MEILISEARCH_KEY,
-    'index' => MEILISEARCH_INDEX
-];
+use App\Services\MeiliSearchService;
 
-// Получаем подключение к БД
+// Получаем подключение к БД и MeiliSearch
 try {
     $pdo = getPdo();
+    $meiliService = new MeiliSearchService();
 } catch (PDOException $e) {
     die("Ошибка подключения к MySQL: " . $e->getMessage());
+} catch (Exception $e) {
+    die("Ошибка подключения к MeiliSearch: " . $e->getMessage());
 }
 
 // Функция для нормализации первой строки
@@ -64,93 +63,19 @@ function generateNameVariants($firstName, $middleName, $lastName) {
     return array_unique($variants);
 }
 
-// Функция для получения настроек CURL
-function getCurlOptions($url, $method = 'GET', $data = null, $headers = []) {
-    $options = [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_VERBOSE => false
-    ];
-
-    if ($method === 'POST') {
-        $options[CURLOPT_POST] = true;
-        if ($data !== null) {
-            $options[CURLOPT_POSTFIELDS] = $data;
-        }
-    } elseif ($method !== 'GET') {
-        $options[CURLOPT_CUSTOMREQUEST] = $method;
-    }
-
-    if (!empty($headers)) {
-        $options[CURLOPT_HTTPHEADER] = $headers;
-    }
-
-    return $options;
-}
-
-// Функция отправки данных в Meilisearch
-function sendToMeilisearch($documents, $meilisearchConfig) {
-    $url = $meilisearchConfig['host'] . '/indexes/' . $meilisearchConfig['index'] . '/documents';
-    
-    $headers = [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $meilisearchConfig['key']
-    ];
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, getCurlOptions(
-        $url,
-        'POST',
-        json_encode($documents, JSON_UNESCAPED_UNICODE),
-        $headers
-    ));
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($response === false) {
-        throw new Exception("Ошибка соединения с Meilisearch: $error");
-    }
-    
-    if ($httpCode !== 202) {
-        throw new Exception("Ошибка отправки в Meilisearch: HTTP $httpCode, Response: $response");
-    }
-    
-    return json_decode($response, true);
-}
-
-// Очистка индекса
-function clearIndex($meilisearchConfig) {
-    $url = $meilisearchConfig['host'] . '/indexes/' . $meilisearchConfig['index'] . '/documents';
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST => 'DELETE',
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $meilisearchConfig['key']
-        ]
-    ]);
-    
-    curl_exec($ch);
-    curl_close($ch);
-    
-    echo "Индекс очищен\n";
-}
 
 // Основная логика переноса
 try {
     echo "Начинаем перенос данных...\n";
     
     // Очищаем индекс
-    clearIndex($meilisearchConfig);
+    echo "Очищаем индекс...\n";
+    $clearTask = $meiliService->clearIndex();
+    echo "Задача очистки: " . $clearTask['taskUid'] . "\n";
+    
+    // Ждем завершения очистки
+    $meiliService->waitForTask($clearTask['taskUid']);
+    echo "Индекс очищен\n";
     
     $documents = [];
     
@@ -213,6 +138,8 @@ try {
     
     $results = $pdo->query($poemsQuery)->fetchAll(PDO::FETCH_ASSOC);
     
+    
+    
     // Собираем все fragment_id для батчевого получения строк
     $fragmentIds = [];
     foreach ($results as $row) {
@@ -241,7 +168,7 @@ try {
         }
     }
     
-    // Заполняем тексты в результатах
+    // Заполняем тексты в результатах  
     foreach ($results as &$row) {
         if ($row['fragment_id'] && isset($allLines[$row['fragment_id']])) {
             $lines = $allLines[$row['fragment_id']];
@@ -252,6 +179,8 @@ try {
             $row['first_line'] = '';
         }
     }
+    unset($row); // ВАЖНО: очищаем ссылку!
+    
     
     // Предварительно создаем индекс авторов для быстрого поиска
     $authorsIndex = [];
@@ -300,8 +229,10 @@ try {
             $firstLine = $row['first_line'] ?: '';
             $isStandalone = !$row['is_divided'];
             
+            $docId = 'poem_small_' . $row['fragment_id'];
+            
             $fragmentDoc = [
-                'id' => 'poem_small_' . $row['fragment_id'],
+                'id' => $docId,
                 'type' => 'poem_small',
                 'title' => $row['title'],
                 'first_line' => $firstLine,
@@ -330,18 +261,13 @@ try {
     
     echo "Найдено документов для переноса: " . count($documents) . "\n";
     
-    // Отправляем данные в Meilisearch батчами по 100 документов
-    $batchSize = 100;
-    $batches = array_chunk($documents, $batchSize);
+    // Отправляем данные в Meilisearch батчами
+    $tasks = $meiliService->addDocumentsBatch($documents, 100);
     
-    foreach ($batches as $i => $batch) {
-        echo "Отправляем батч " . ($i + 1) . " из " . count($batches) . " (" . count($batch) . " документов)...\n";
-        $response = sendToMeilisearch($batch, $meilisearchConfig);
-        echo "Задача: " . $response['taskUid'] . "\n";
-        
-        // Небольшая пауза между батчами
-        sleep(1);
-    }
+    // Настраиваем поисковые атрибуты
+    echo "Настраиваем поисковые атрибуты...\n";
+    $configTasks = $meiliService->configureSearchAttributes();
+    echo "Настройки обновлены\n";
     
     echo "\nПеренос завершен!\n";
     echo "Всего документов: " . count($documents) . "\n";

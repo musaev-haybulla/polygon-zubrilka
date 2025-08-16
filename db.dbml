@@ -1,6 +1,6 @@
-# Схема базы данных polygon-zubrilka
-# Обновлено 2025-07-31
-# Актуальная структура БД polygon-zubrilka-test после рефакторинга 
+# Схема базы данных app
+# Сгенерировано 2025-08-17 02:08:51
+# Команда: mysql_to_dbdiagram 
 
 Table authors {
   id           bigint            [pk, increment, not null]
@@ -40,6 +40,11 @@ Table lines {
   deleted_at   datetime          
 }
 
+Table poem_authors {
+  poem_id    bigint      [pk, not null]
+  author_id  bigint      [pk, not null]
+}
+
 Table poems {
   id            bigint                                       [pk, increment, not null]
   owner_id      bigint                                       
@@ -52,39 +57,35 @@ Table poems {
   deleted_at    datetime                                     
 }
 
-Table poem_authors {
-  poem_id    bigint      [pk, not null]
-  author_id  bigint      [pk, not null]
+Table timings {
+  id          bigint            [pk, increment, not null]
+  track_id    bigint            [not null]
+  line_id     bigint            [not null]
+  end_time    decimal(8,3)      [not null]
+  created_at  timestamp         
+  updated_at  timestamp         
 }
 
 Table tracks {
-  id                   bigint                  [pk, increment, not null]
-  fragment_id          bigint                  [not null]
-  filename             varchar(255)            [not null, note: 'Имя файла в формате title-slug-timestamp.mp3']
-  original_filename    varchar(255)            [note: 'Имя оригинального файла до обрезки']
-  duration             decimal(8,3)            [not null]
-  is_ai_generated      tinyint(1)              [not null]
-  title                varchar(255)            [not null]
-  sort_order           int                     [not null]
-  status               enum('draft', 'active') [not null, default: 'draft']
-  created_at           timestamp               
-  updated_at           timestamp               
+  id                 bigint                      [pk, increment, not null]
+  fragment_id        bigint                      [not null]
+  filename           varchar(255)                [not null]
+  original_filename  varchar(255)                
+  duration           decimal(8,3)                [not null]
+  is_ai_generated    boolean                     [not null]
+  title              varchar(255)                [not null]
+  sort_order         int                         [not null]
+  status             enum('draft','active')      [not null]
+  created_at         timestamp                   
+  updated_at         timestamp                   
 }
 
-Table timings {
-  id        bigint                                   [pk, increment, not null]
-  track_id  bigint                                   [not null]
-  line_id   bigint                                   [not null]  
-  end_time  decimal(8,3)                             [not null]
-  created_at timestamp                               
-  updated_at timestamp                               
-}
 
-# Внешние ключи
-Ref: tracks.fragment_id > fragments.id [delete: cascade]
-Ref: timings.track_id > tracks.id [delete: cascade]
-Ref: timings.line_id > lines.id [delete: cascade]
-Ref: poem_authors.author_id > authors.id [delete: cascade]
-Ref: poem_authors.poem_id > poems.id [delete: cascade]
+// Внешние ключи
 Ref: fragments.poem_id > poems.id [delete: cascade]
 Ref: lines.fragment_id > fragments.id [delete: cascade]
+Ref: poem_authors.author_id > authors.id [delete: cascade]
+Ref: poem_authors.poem_id > poems.id [delete: cascade]
+Ref: timings.line_id > lines.id [delete: cascade]
+Ref: timings.track_id > tracks.id [delete: cascade]
+Ref: tracks.fragment_id > fragments.id [delete: cascade]
