@@ -521,7 +521,7 @@
           const { start, end } = this.currentRegion;
           if (typeof start === 'number' && typeof end === 'number' && end > start) {
             try {
-              this.wavesurfer.play(start, end);
+              this.currentRegion.play(true);  // true = stopAtEnd для точной остановки
               this.isPlaying = true;
             } catch (e) {
               console.warn(e);
@@ -535,7 +535,7 @@
             const { start, end } = this.currentRegion;
             if (typeof start === 'number' && typeof end === 'number' && end > start) {
               try {
-                this.wavesurfer.play(start, end);
+                this.currentRegion.play(true);  // true = stopAtEnd для точной остановки
                 this.isPlaying = true;
               } catch (e) {
                 console.warn(e);
