@@ -9,6 +9,7 @@ require __DIR__ . '/config/config.php';
 require __DIR__ . '/vendor/autoload.php';
 
 use App\AudioFileHelper;
+use App\AudioSorter;
 
 
 // Настройка отображения ошибок для разработки
